@@ -1,0 +1,1943 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0;font:14px system-ui,sans-serif}</style>
+<title>Island Span</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Archivo:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: full-bleed canvas world; dark ink control strips float over the sky (top) and along the bottom (materials). */
+:root {
+  --sky: #a9d3dc;
+  --ink: #15222a;
+  --ink-2: #1f313b;
+  --line: #34495488;
+  --text: #edf3f1;
+  --muted: #93a9b0;
+  --accent: #f08a24;
+  --good: #5fbf6a;
+  --bad: #e2564a;
+  --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--sky); color: var(--text); font-family: var(--body); overflow: hidden; -webkit-user-select: none; user-select: none; }
+#app { position: fixed; inset: 0; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+canvas.erase { cursor: not-allowed; }
+canvas.move { cursor: grab; }
+canvas.move.grabbing { cursor: grabbing; }
+.bar { position: absolute; display: flex; gap: 8px; align-items: center; }
+#top {
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  justify-content: space-between; flex-wrap: wrap; pointer-events: none;
+}
+#top > * { pointer-events: auto; }
+.brand { display: flex; align-items: baseline; gap: 10px; background: var(--ink); padding: 6px 12px 7px; border-radius: 6px; }
+.brand h1 { font-family: var(--display); font-weight: 800; font-size: 24px; letter-spacing: .02em; margin: 0; line-height: 1; text-transform: uppercase; }
+.brand h1 span { color: var(--accent); }
+.brand .cost { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.brand .cost b { color: var(--text); font-weight: 600; }
+.controls { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+#boatsBtn.on { border-color: var(--accent); color: var(--accent); }
+.boat-panel { position: absolute; top: calc(62px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: min(320px, calc(100% - 32px)); background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; z-index: 6; box-shadow: 0 12px 40px #0a141a55; }
+.bp-row { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; }
+.bp-row select { flex: 1; }
+.bp-row input[type=range] { flex: 1; accent-color: var(--accent); }
+.bp-row .val { font-variant-numeric: tabular-nums; min-width: 3.5em; text-align: right; color: var(--muted); }
+.bp-row input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
+.bp-note { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.boat-info { font-size: 12.5px; color: var(--text); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .boat-panel { top: calc(108px + env(safe-area-inset-top, 0px)); } }
+button, select { font: 600 13px/1 var(--body); color: var(--text); background: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 9px 12px; cursor: pointer; }
+button:hover, select:hover { background: var(--ink-2); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: default; }
+#play { background: var(--accent); color: #1a1206; border-color: transparent; min-width: 92px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+#play:hover { background: #ff9c3c; }
+#play.stop { background: var(--bad); color: #fff; }
+#tools {
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  flex-direction: column; align-items: stretch; gap: 6px; pointer-events: none;
+}
+#tools > * { pointer-events: auto; }
+.strip { display: flex; gap: 6px; overflow-x: auto; background: var(--ink); padding: 6px; border-radius: 8px; scrollbar-width: thin; align-self: center; max-width: 100%; }
+.tool { display: grid; grid-template-columns: 26px auto; grid-template-rows: auto auto; column-gap: 8px; align-items: center; text-align: left; padding: 7px 10px 7px 8px; background: transparent; border-color: transparent; flex: 0 0 auto; }
+.tool .sw { grid-row: span 2; width: 26px; height: 26px; border-radius: 4px; }
+.tool .nm { font-weight: 600; font-size: 13px; }
+.tool .pr { font-weight: 500; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tool kbd { font: 500 10px var(--body); color: var(--muted); margin-left: 4px; }
+.tool[aria-pressed="true"] { background: var(--ink-2); border-color: var(--accent); }
+.hint { align-self: center; background: #15222ad9; color: var(--text); font-size: 12.5px; padding: 6px 12px; border-radius: 6px; max-width: 100%; text-align: center; text-wrap: balance; }
+.hint b { color: var(--accent); font-weight: 600; }
+#simhud { display: flex; gap: 10px; align-items: center; align-self: center; background: var(--ink); padding: 8px 12px; border-radius: 8px; flex-wrap: wrap; justify-content: center; }
+#simhud label { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+#simhud input[type=range] { width: 160px; accent-color: var(--accent); }
+.stall { position: absolute; top: calc(66px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); text-align: center; text-wrap: balance; font-size: 14px; font-weight: 700; color: #1a1206; background: var(--accent); padding: 8px 16px; border-radius: 6px; box-shadow: 0 6px 20px #0a141a40; z-index: 5; }
+@media (max-width: 640px) { .stall { top: calc(112px + env(safe-area-inset-top, 0px)); font-size: 12.5px; } }
+#brake { font-weight: 700; letter-spacing: .03em; }
+#brake[aria-pressed="true"] { background: var(--bad); border-color: transparent; color: #fff; }
+#simhud .val { font-variant-numeric: tabular-nums; color: var(--text); min-width: 3.2em; }
+.meter { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.meter i { display: block; width: 90px; height: 8px; border-radius: 4px; background: #2c3e47; overflow: hidden; }
+.meter i s { display: block; height: 100%; width: 0; background: var(--good); text-decoration: none; }
+#banner { position: absolute; left: 50%; top: 28%; transform: translate(-50%, -50%); background: var(--ink); padding: 18px 26px 16px; border-radius: 10px; text-align: center; border-top: 4px solid var(--good); box-shadow: 0 12px 40px #0a141a55; max-width: calc(100% - 32px); }
+#banner.fail { border-top-color: var(--bad); }
+#banner h2 { font-family: var(--display); font-weight: 800; text-transform: uppercase; font-size: 38px; margin: 0 0 4px; letter-spacing: .02em; line-height: 1; }
+#banner p { margin: 0 0 12px; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+#banner .row { display: flex; gap: 8px; justify-content: center; }
+#confirm { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); background: var(--ink); padding: 16px 20px; border-radius: 10px; text-align: center; box-shadow: 0 12px 40px #0a141a55; }
+#confirm p { margin: 0 0 12px; font-size: 14px; }
+#confirm .row { display: flex; gap: 8px; justify-content: center; }
+@media (max-width: 640px) {
+  .brand h1 { font-size: 20px; }
+  .tool { grid-template-columns: 22px auto; padding: 6px 8px 6px 6px; }
+  .tool .sw { width: 22px; height: 22px; }
+  .tool kbd { display: none; }
+  button, select { padding: 8px 10px; font-size: 12px; }
+  #simhud input[type=range] { width: 120px; }
+  .hint { font-size: 11.5px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="cv" aria-label="Bridge building area between two islands"></canvas>
+  <div class="bar" id="top">
+    <div class="brand"><h1>Island <span>Span</span></h1><div class="cost">Cost <b id="cost">$0</b> · <span id="count">0 parts</span></div></div>
+    <div class="controls">
+      <button id="boatsBtn" aria-expanded="false" aria-controls="boatPanel">Boats: off</button>
+      <button id="example" title="Load an example bridge">Example</button>
+      <button id="undo" title="Undo (Ctrl+Z)">Undo</button>
+      <button id="clear" title="Remove everything you built">Clear</button>
+      <select id="vehicle" aria-label="Test vehicle">
+        <option value="bike">Bike · fastest</option>
+        <option value="car" selected>Car</option>
+        <option value="truck">Truck</option>
+        <option value="bus">Bus</option>
+        <option value="none">No vehicle</option>
+      </select>
+      <button id="play" title="Test the bridge (Space)">▶ Test</button>
+    </div>
+  </div>
+  <div class="boat-panel" id="boatPanel" hidden>
+    <label class="bp-row"><input type="checkbox" id="boatsOn"> Boats sail under the bridge</label>
+    <label class="bp-row" for="boatType">Boat
+      <select id="boatType">
+        <option value="speedboat">Speedboat · 1.9 m</option>
+        <option value="tugboat">Tugboat · 6.2 m</option>
+        <option value="cargo">Cargo ship · 9.6 m</option>
+        <option value="sailboat">Sailboat · 11.5 m</option>
+        <option value="mixed">Mixed fleet · takes turns</option>
+      </select>
+    </label>
+    <label class="bp-row" for="boatDelay">Arrives after <input type="range" id="boatDelay" min="1" max="30" step="0.5"><span class="val" id="boatDelayVal">5 s</span></label>
+    <label class="bp-row" for="boatLane">Lane <input type="range" id="boatLane" min="0" max="24" step="0.5"><span class="val" id="boatLaneVal">12 m</span></label>
+    <p class="bp-note">Arrival time counts from pressing Test, then another boat comes every 11 s. Heights are above the water. The deck sits 7 m up, so tall boats need a drawbridge or a clear gap. A boat that runs into a pier sinks.</p>
+  </div>
+  <div class="stall" id="stall" role="status" hidden>Pistons stalled to protect the bridge · move the slider back to free them</div>
+  <div class="bar" id="tools">
+    <div id="banner" hidden><h2 id="bTitle"></h2><p id="bText"></p><div class="row"><button id="bRetry">Run again</button><button id="bEdit">Back to building</button></div></div>
+    <div id="confirm" hidden><p>Remove everything you built?</p><div class="row"><button id="cYes">Clear bridge</button><button id="cNo">Keep it</button></div></div>
+    <div class="hint" id="hint"></div>
+    <div id="simhud" hidden>
+      <label id="hydroWrap">Hydraulics <input type="range" id="hydro" min="50" max="150" step="5" value="100"><span class="val" id="hydroVal">100%</span><span class="val" id="pistonCount"></span></label>
+      <button id="brake" aria-pressed="false" title="Brake (B)">Brake</button>
+      <span class="boat-info" id="boatInfo" hidden></span>
+      <div class="meter">Peak stress <i><s id="stressBar"></s></i><span class="val" id="stressVal">0%</span></div>
+      <label><input type="checkbox" id="stressView" checked> Stress colors</label>
+    </div>
+    <div class="strip" id="strip" role="toolbar" aria-label="Materials"></div>
+  </div>
+</div>
+
+<script>
+// ===== Bridge physics engine (XPBD, position based) =====
+const G = 9.8;
+const WORLD = {
+  leftEdge: 0,      // x where left island cliff is
+  rightEdge: 24,    // x where right island cliff starts
+  top: 0,           // island top surface (y down)
+  water: 7,         // water surface
+  seabed: 19,       // sea floor
+  islandDepth: 40,
+  leftFar: -22,
+  rightFar: 46
+};
+const MATERIALS = {
+  road:       { name: 'Road',       mass: 0.5, strength: 900, compliance: 2.0e-6, maxLen: 4,  cost: 220, tension: false, width: 0.42 },
+  wood:       { name: 'Wood',       mass: 0.2, strength: 700, compliance: 3.0e-6, maxLen: 4,  cost: 150, tension: false, width: 0.24 },
+  steel:      { name: 'Steel',      mass: 0.45, strength: 1700, compliance: 0.8e-6, maxLen: 6,  cost: 400, tension: false, width: 0.22 },
+  rope:       { name: 'Rope',       mass: 0.04, strength: 450, compliance: 6.0e-6, maxLen: 8,  cost: 90,  tension: true,  width: 0.08 },
+  cable:      { name: 'Cable',      mass: 0.1, strength: 1900, compliance: 1.0e-6, maxLen: 14, cost: 320, tension: true,  width: 0.07 },
+  spring:     { name: 'Spring',     mass: 0.3, strength: 1400, compliance: 1.5e-4, maxLen: 5,  cost: 260, tension: false, width: 0.26 },
+  hydraulics: { name: 'Hydraulics', mass: 0.7, strength: 1600, push: 1100, compliance: 2e-6, maxLen: 5,  cost: 700, tension: false, width: 0.3 },
+  foundation: { name: 'Foundation', cost: 900 }
+};
+const VEHICLES = {
+  bike:  { name: 'Bike',  bodyMass: 1.4, wheelMass: 0.4, wheelbase: 1.5, radius: 0.36, height: 0.85, speed: 20, accel: 12, bounce: 0.55 },
+  car:   { name: 'Car',   bodyMass: 8, wheelMass: 1, wheelbase: 2.6, radius: 0.42, height: 1.1, speed: 6, accel: 5, bounce: 0.42 },
+  truck: { name: 'Truck', bodyMass: 26, wheelMass: 3, wheelbase: 3.6, radius: 0.55, height: 1.9, speed: 4.5, accel: 6.5, bounce: 0.3 },
+  bus:   { name: 'Bus',   bodyMass: 44, wheelMass: 4, wheelbase: 5.0, radius: 0.55, height: 2.4, speed: 4, accel: 6, bounce: 0.25 }
+};
+
+function beamLen(n1, n2) { return Math.hypot(n2.x - n1.x, n2.y - n1.y); }
+
+function designCost(design) {
+  let c = 0;
+  const byId = new Map(design.nodes.map(n => [n.id, n]));
+  for (const b of design.beams) {
+    const a = byId.get(b.a), d = byId.get(b.b);
+    if (a && d) c += beamLen(a, d) * MATERIALS[b.mat].cost;
+  }
+  for (const n of design.nodes) if (n.foundation) c += MATERIALS.foundation.cost;
+  return Math.round(c);
+}
+
+function createSim(design, vehicleKey) {
+  const idx = new Map();
+  const nodes = design.nodes.map((n, i) => {
+    idx.set(n.id, i);
+    return { x: n.x, y: n.y, px: n.x, py: n.y, vx: 0, vy: 0, m: 0, w: 0, anchor: !!n.anchor, id: n.id };
+  });
+  const beams = [];
+  for (const b of design.beams) {
+    const ia = idx.get(b.a), ib = idx.get(b.b);
+    if (ia === undefined || ib === undefined) continue;
+    const L = beamLen(nodes[ia], nodes[ib]);
+    const mat = MATERIALS[b.mat];
+    beams.push({ a: ia, b: ib, rest: L, base: L, mat: b.mat, stress: 0, avg: 0, broken: false, id: b.id, off: !!b.off });
+    nodes[ia].m += L * mat.mass / 2;
+    nodes[ib].m += L * mat.mass / 2;
+  }
+  for (const n of nodes) n.w = n.anchor ? 0 : 1 / Math.max(n.m, 0.08);
+  // layered parts: several parts between the same two joints act as one member and share the load
+  // in proportion to their stiffness (pistons always work on their own)
+  const groups = new Map(), solve = [];
+  for (const b of beams) {
+    if (b.mat === 'hydraulics') { solve.push([b]); continue; }
+    const key = Math.min(b.a, b.b) + '-' + Math.max(b.a, b.b);
+    let g = groups.get(key);
+    if (!g) { g = []; groups.set(key, g); solve.push(g); }
+    g.push(b);
+  }
+
+  const sim = { nodes, beams, solve, t: 0, piston: 1, pistonVel: 0, pistonTarget: 1, carNodes: [], carCons: [], status: 'running', breaks: 0, maxStress: 0, events: [] };
+  if (vehicleKey) addVehicle(sim, vehicleKey);
+  return sim;
+}
+
+function addVehicle(sim, key) {
+  const v = VEHICLES[key];
+  const x0 = WORLD.leftEdge - 17.5;
+  const r = v.radius;
+  const base = sim.nodes.length;
+  const mk = (x, y, m, wheel) => ({ x, y, px: x, py: y, vx: 0, vy: 0, m, w: 1 / m, anchor: false, wheel, r: wheel ? r : 0.2, car: true });
+  sim.nodes.push(mk(x0, WORLD.top - r, v.wheelMass, true));                         // rear wheel
+  sim.nodes.push(mk(x0 + v.wheelbase, WORLD.top - r, v.wheelMass, true));           // front wheel
+  sim.nodes.push(mk(x0 - 0.3, WORLD.top - r - v.height, v.bodyMass / 2, false));    // rear roof
+  sim.nodes.push(mk(x0 + v.wheelbase + 0.3, WORLD.top - r - v.height, v.bodyMass / 2, false)); // front roof
+  const ids = [base, base + 1, base + 2, base + 3];
+  sim.carNodes = ids;
+  const pairs = [[0, 1], [0, 2], [1, 3], [2, 3], [0, 3], [1, 2]];
+  sim.carCons = pairs.map(([i, j]) => ({ a: ids[i], b: ids[j], rest: beamLen(sim.nodes[ids[i]], sim.nodes[ids[j]]) }));
+  sim.vehicle = v;
+  sim.vehicleKey = key;
+}
+
+// Lumps on the island roads: speed bumps and a kicker ramp that can throw vehicles into the air
+const BUMPS = [
+  { x: 27.5, w: 1.4, h: 0.18 }   // landing lump on the far side
+];
+function groundY(x) {
+  let y = WORLD.top;
+  for (const b of BUMPS) {
+    const t = (x - (b.x - b.w / 2)) / b.w;
+    if (t > 0 && t < 1) y -= b.h * Math.sin(Math.PI * t) ** 2;
+  }
+  return y;
+}
+function surfacePolyline(x0, x1) {
+  const pts = [];
+  const step = 0.2;
+  for (let x = x0; x < x1; x += step) pts.push([x, groundY(x)]);
+  pts.push([x1, groundY(x1)]);
+  return pts;
+}
+function terrainSegments() {
+  const W = WORLD;
+  const segs = [];
+  const addLine = pts => { for (let i = 0; i < pts.length - 1; i++) segs.push([pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]]); };
+  addLine(surfacePolyline(W.leftFar, W.leftEdge));
+  addLine(surfacePolyline(W.rightEdge, W.rightFar));
+  segs.push([W.leftEdge, W.top, W.leftEdge, W.top + W.islandDepth]);
+  segs.push([W.rightEdge, W.top + W.islandDepth, W.rightEdge, W.top]);
+  segs.push([W.leftFar - 0.01, W.top - 30, W.leftFar - 0.01, W.top]);
+  segs.push([W.rightFar + 0.01, W.top, W.rightFar + 0.01, W.top - 30]);
+  return segs;
+}
+const TERRAIN = terrainSegments();
+
+function inIsland(x, y) {
+  return y > WORLD.top && (x < WORLD.leftEdge || x > WORLD.rightEdge);
+}
+
+function stepSim(sim, dt) {
+  const SUB = 24;
+  const h = dt / SUB;
+  const h2 = h * h;
+  const nodes = sim.nodes, beams = sim.beams;
+  const v = sim.vehicle;
+  const hyd = beams.filter(b => b.mat === 'hydraulics');
+  if (hyd.length && !sim.hydLinks) {
+    // each piston watches the parts sharing its joints, so it can stall before they snap
+    sim.hydLinks = new Map(hyd.map(hb => [hb, beams.filter(o => o !== hb && (o.a === hb.a || o.b === hb.a || o.a === hb.b || o.b === hb.b))]));
+  }
+
+  let maxS = 0;
+  for (let s = 0; s < SUB; s++) {
+    // hydraulics: each piston eases toward the slider target and moves every substep, so it never jerks.
+    // Safety valve: if anything in the bridge nears its limit while a piston moves, that piston stalls
+    // where it is until the slider is moved again.
+    if (hyd.length) {
+      const VMAX = 0.12, ACC = 0.5;
+      const worst = sim.liveMax || 0;
+      let moving = false;
+      for (const b of hyd) {
+        if (b.broken) continue;
+        if (b.off) { b.rv = 0; b.jammed = false; b.cmd = undefined; continue; } // switched off: locked at its current length
+        if (b.r === undefined) { b.r = 1; b.rv = 0; }
+        if (b.cmd !== sim.pistonTarget) { b.cmd = sim.pistonTarget; b.jammed = false; b.floor = worst; }
+        b.floor = Math.min(b.floor, worst); // track how relaxed the bridge has become during this move
+        // a stalled piston retries by itself once the bridge has stayed calm for a moment
+        if (b.jammed) {
+          b.calm = worst < 0.5 ? (b.calm || 0) + h : 0;
+          if (b.calm > 0.3) { b.jammed = false; b.calm = 0; b.floor = worst; }
+        }
+        const gap = sim.pistonTarget - b.r;
+        // stall only when this move is pushing stress up toward the breaking point
+        if (!b.jammed && Math.abs(b.rv) > 1e-4 && worst > Math.max(0.8, b.floor + 0.2)) {
+          b.jammed = true; b.jamDir = Math.sign(b.rv); b.jamR = b.r; b.rv = 0; // stop dead: pistons have no momentum of their own
+        }
+        if (b.jammed) {
+          // brake smoothly, then ease back a little so the stress that tripped the valve bleeds off
+          const back = -b.jamDir * VMAX * 0.25 * Math.min(1, Math.max(0, (worst - 0.55) / 0.2));
+          b.rv += Math.max(-ACC * 4 * h, Math.min(ACC * 4 * h, back - b.rv));
+          b.r += b.rv * h;
+          const lim = b.jamR - b.jamDir * 0.015; // back off at most a few centimetres
+          if (b.jamDir > 0 && b.r < lim) { b.r = lim; b.rv = 0; }
+          if (b.jamDir < 0 && b.r > lim) { b.r = lim; b.rv = 0; }
+          b.rest = b.base * b.r;
+          continue;
+        }
+        const stopV = Math.sqrt(2 * ACC * Math.abs(gap)) * Math.sign(gap);
+        const want = Math.max(-VMAX, Math.min(VMAX, stopV));
+        b.rv += Math.max(-ACC * h, Math.min(ACC * h, want - b.rv));
+        b.r += b.rv * h;
+        if (Math.abs(gap) < 1e-4 && Math.abs(b.rv) < 1e-3) { b.r = sim.pistonTarget; b.rv = 0; }
+        else moving = true;
+        // no wind-up: a piston that can't keep up stays within a hair of its real length,
+        // so it can never spring out when something nearby gives way
+        const A = nodes[b.a], B = nodes[b.b];
+        const cur = Math.hypot(B.x - A.x, B.y - A.y) / b.base;
+        const lead = 0.01;
+        if (gap > 0 && b.r > cur + lead) { b.r = Math.max(b.r - b.rv * h, cur + lead); if (b.rv > 0) b.rv *= 0.5; }
+        else if (gap < 0 && b.r < cur - lead) { b.r = Math.min(b.r - b.rv * h, cur - lead); if (b.rv < 0) b.rv *= 0.5; }
+        b.rest = b.base * b.r;
+      }
+      let sum = 0, cnt = 0; for (const b of hyd) if (!b.broken && !b.off && b.r !== undefined) { sum += b.r; cnt++; }
+      sim.piston = cnt ? sum / cnt : sim.pistonTarget;
+      sim.pistonJammed = hyd.filter(b => !b.broken && !b.off && b.jammed).length;
+    }
+    for (const n of nodes) {
+      if (n.w === 0) continue;
+      n.vy += G * h;
+      if (n.car) { n.ivx = n.vx; n.ivy = n.vy; }
+      n.px = n.x; n.py = n.y;
+      n.x += n.vx * h; n.y += n.vy * h;
+    }
+    // beams (a layered group is solved as one member, then each layer takes its share of the force)
+    for (const g of sim.solve) {
+      const b0 = g[0];
+      const A = nodes[b0.a], B = nodes[b0.b];
+      const W = A.w + B.w;
+      if (W === 0) continue;
+      const dx = B.x - A.x, dy = B.y - A.y;
+      const L = Math.hypot(dx, dy) || 1e-9;
+      let kSum = 0, rest = b0.rest;
+      for (const b of g) {
+        b.k = 0;
+        if (b.broken) continue;
+        const mat = MATERIALS[b.mat];
+        if (mat.tension && L - b.rest < 0) { b.stress = 0; b.avg *= 0.9; b.fast = (b.fast || 0) * 0.9; continue; }
+        b.k = 1 / (mat.compliance * b.rest);
+        kSum += b.k;
+      }
+      if (kSum === 0) continue;
+      const C = L - rest;
+      const alpha = 1 / kSum / h2;
+      let dl = -C / (W + alpha);
+      const isHyd = b0.mat === 'hydraulics';
+      if (isHyd) { const cap = MATERIALS.hydraulics.push * h2; if (dl > cap) dl = cap; else if (dl < -cap) dl = -cap; }
+      const nx = dx / L, ny = dy / L;
+      A.x -= nx * dl * A.w; A.y -= ny * dl * A.w;
+      B.x += nx * dl * B.w; B.y += ny * dl * B.w;
+      const force = Math.abs(dl) / h2;
+      for (const b of g) {
+        if (b.broken || !b.k) continue;
+        const mat = MATERIALS[b.mat];
+        b.stress = force * (b.k / kSum) / mat.strength;
+        b.fast = (b.fast || 0) + (b.stress - (b.fast || 0)) * 0.08;
+        b.avg += (b.stress - b.avg) * 0.006; // ~0.12 s memory: sustained overload breaks parts, momentary jolts don't
+        if (isHyd && b.avg > 1) b.avg = 1; // a jammed piston stalls instead of snapping
+        if (b.avg > maxS) maxS = b.avg;
+        if (b.avg > 1) {
+          b.broken = true; sim.breaks++;
+          sim.events.push({ type: 'break', x: (A.x + B.x) / 2, y: (A.y + B.y) / 2, mat: b.mat });
+        }
+      }
+    }
+    // vehicle frame
+    for (const c of sim.carCons) {
+      const A = nodes[c.a], B = nodes[c.b];
+      const dx = B.x - A.x, dy = B.y - A.y;
+      const L = Math.hypot(dx, dy) || 1e-9;
+      const dl = -(L - c.rest) / (A.w + B.w);
+      const nx = dx / L, ny = dy / L;
+      A.x -= nx * dl * A.w; A.y -= ny * dl * A.w;
+      B.x += nx * dl * B.w; B.y += ny * dl * B.w;
+    }
+    // wheel contacts
+    for (const id of sim.carNodes) {
+      const n = nodes[id];
+      n.contact = null;
+      const r = n.r;
+      for (const b of beams) {
+        if (b.broken || b.mat !== 'road') continue;
+        const A = nodes[b.a], B = nodes[b.b];
+        collideSeg(n, r, A.x, A.y, B.x, B.y, A, B);
+      }
+      for (const t of TERRAIN) collideSeg(n, r, t[0], t[1], t[2], t[3], null, null);
+    }
+    // nodes vs terrain
+    for (const n of nodes) {
+      if (n.w === 0 || n.wheel) continue;
+      if (inIsland(n.x, n.y)) {
+        const dTop = n.y - WORLD.top;
+        const dSide = n.x < WORLD.leftEdge ? WORLD.leftEdge - n.x : n.x - WORLD.rightEdge;
+        if (dTop < dSide) n.y = WORLD.top;
+        else n.x = n.x < WORLD.leftEdge ? WORLD.leftEdge : WORLD.rightEdge;
+      }
+      if (n.y > WORLD.seabed) n.y = WORLD.seabed;
+    }
+    // velocities
+    for (const n of nodes) {
+      if (n.w === 0) continue;
+      n.vx = (n.x - n.px) / h; n.vy = (n.y - n.py) / h;
+      let damp = 0.99997;
+      if (n.y > WORLD.water) damp = 0.9985;
+      n.vx *= damp; n.vy *= damp;
+    }
+    if (hyd.length) { let m = 0; for (const b of beams) if (!b.broken && b.mat !== 'hydraulics') m = Math.max(m, b.fast || 0); sim.liveMax = m; }
+    // bounce: a wheel that slams into a lump, a kink in the road or the ground after a jump springs back up
+    for (const id of sim.carNodes) {
+      const n = nodes[id];
+      if (!n.contact) continue;
+      const { nx, ny } = n.contact;
+      const vin = n.ivx * nx + n.ivy * ny;          // < 0 means it was heading into the surface
+      if (vin < -1.0) {
+        const e = n.wheel ? (sim.vehicle ? sim.vehicle.bounce : 0.4) : 0.15;
+        const vnow = n.vx * nx + n.vy * ny;
+        const want = Math.min(7, -vin * e);
+        if (want > vnow) { n.vx += nx * (want - vnow); n.vy += ny * (want - vnow); }
+      }
+    }
+    // material damping: every part soaks up vibration along its length, so structures settle instead of ringing
+    for (const o of beams) {
+      {
+        if (o.broken) continue;
+        const A = nodes[o.a], B = nodes[o.b];
+        const W = A.w + B.w; if (W === 0) continue;
+        let nx = B.x - A.x, ny = B.y - A.y; const L = Math.hypot(nx, ny) || 1; nx /= L; ny /= L;
+        const vr = (B.vx - A.vx) * nx + (B.vy - A.vy) * ny;
+        const k = (o.mat === 'hydraulics' ? 0.3 : o.mat === 'spring' ? 0.004 : 0.12) * vr / W; // springs barely damp, so they bounce
+        A.vx += nx * k * A.w; A.vy += ny * k * A.w;
+        B.vx -= nx * k * B.w; B.vy -= ny * k * B.w;
+      }
+    }
+    // drive, brake and grip: all measured against the surface under the wheel, so a vehicle rides
+    // along with a moving or swaying deck instead of the deck sliding out from under it
+    if (v) {
+      const ratio = (v.bodyMass + 2 * v.wheelMass) / (2 * v.wheelMass); // engine force moves the whole vehicle
+      for (const id of sim.carNodes) {
+        const n = nodes[id];
+        if (!n.wheel || !n.contact) continue;
+        const c = n.contact;
+        let tx = -c.ny, ty = c.nx;
+        if (tx < 0) { tx = -tx; ty = -ty; }
+        // velocity of the road surface at the contact point (zero on solid ground)
+        let svx = 0, svy = 0;
+        if (c.A) { svx = c.A.vx * (1 - c.t) + c.B.vx * c.t; svy = c.A.vy * (1 - c.t) + c.B.vy * c.t; }
+        const vrel = (n.vx - svx) * tx + (n.vy - svy) * ty;
+        let dv;
+        if (sim.brake || sim.status !== 'running') {
+          // brakes (and parking once the run is over) grip hard enough to hold on a slope or a moving deck
+          const grip = Math.max(12, v.accel * 2) * ratio * h;
+          dv = Math.max(-grip, Math.min(grip, -vrel));
+        } else {
+          dv = Math.max(-v.accel * ratio * h * 2, Math.min(v.accel * ratio * h, v.speed - vrel));
+        }
+        n.vx += tx * dv; n.vy += ty * dv;
+        // push back on the deck: what the tyres take, the road gives (spread over the two joints)
+        if (c.A) {
+          const J = dv * n.m;
+          const wa = c.A.w * (1 - c.t), wb = c.B.w * c.t;
+          c.A.vx -= tx * J * wa; c.A.vy -= ty * J * wa;
+          c.B.vx -= tx * J * wb; c.B.vy -= ty * J * wb;
+        }
+      }
+    }
+  }
+  sim.maxStress = maxS;
+  if (v) {
+    const air = !sim.carNodes.some(id => nodes[id].wheel && nodes[id].contact);
+    sim.airborne = air ? (sim.airborne || 0) + dt : 0;
+    if (air && sim.airborne > (sim.bestAir || 0)) sim.bestAir = sim.airborne;
+  }
+  sim.t += dt;
+  if (v && sim.status === 'running') {
+    const body = nodes[sim.carNodes[2]], f = nodes[sim.carNodes[1]];
+    if (body.x > WORLD.rightEdge + 6 && f.y < WORLD.top + 1) sim.status = 'success';
+    else if (body.y > WORLD.water || f.y > WORLD.water + 0.5) sim.status = 'fail';
+  }
+}
+
+function collideSeg(n, r, ax, ay, bx, by, A, B) {
+  const ex = bx - ax, ey = by - ay;
+  const l2 = ex * ex + ey * ey;
+  if (l2 < 1e-9) return;
+  let t = ((n.x - ax) * ex + (n.y - ay) * ey) / l2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = ax + ex * t, cy = ay + ey * t;
+  const dx = n.x - cx, dy = n.y - cy;
+  const d = Math.hypot(dx, dy);
+  if (d >= r || d < 1e-9) return;
+  const nx = dx / d, ny = dy / d;
+  const p = r - d;
+  const wa = A ? A.w : 0, wb = B ? B.w : 0;
+  const ws = (1 - t) * (1 - t) * wa + t * t * wb;
+  const W = n.w + ws;
+  const dl = p / W;
+  n.x += nx * dl * n.w; n.y += ny * dl * n.w;
+  if (A) { A.x -= nx * dl * (1 - t) * wa; A.y -= ny * dl * (1 - t) * wa; }
+  if (B) { B.x -= nx * dl * t * wb; B.y -= ny * dl * t * wb; }
+  if (ny < -0.3) n.contact = { nx, ny, A, B, t }; // remember what it's touching, so grip can follow a moving deck
+}
+
+
+</script>
+<script>
+(() => {
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+
+const PALETTE = {
+  road: '#3b3f44', wood: '#c08f55', steel: '#56687a', rope: '#a5804c', cable: '#2a3139', hydraulics: '#d9652b', spring: '#3d8fd1', foundation: '#a3a8a3'
+};
+const TOOL_ORDER = ['road', 'wood', 'steel', 'rope', 'cable', 'foundation', 'hydraulics', 'spring', 'move', 'erase'];
+const DESC = {
+  road: 'Road · the only surface vehicles drive on · heavy · up to 4 m',
+  wood: 'Wood · light and cheap, takes push and pull · up to 4 m',
+  steel: 'Steel · strong and stiff, heavier · up to 6 m',
+  rope: 'Rope · pull only, goes slack when pushed · weak · up to 8 m',
+  cable: 'Cable · pull only, very strong · up to 14 m',
+  foundation: 'Foundation · tap to sink a fixed concrete pier from the seabed or island',
+  hydraulics: 'Hydraulics · a piston you extend or retract while testing · tap a piston\'s middle to switch it off or on · up to 5 m',
+  spring: 'Spring · squashes and stretches under load, then bounces back · up to 5 m',
+  move: 'Move · drag a joint or foundation to reshape the bridge · parts stretch with it up to their max length',
+  erase: 'Erase · tap a part or joint to remove it'
+};
+
+// ---------- state ----------
+let uid = 1;
+const newId = p => p + (uid++);
+function presetAnchors() {
+  const a = [];
+  for (const y of [0, 3, 6]) {
+    a.push({ id: 'L' + y, x: WORLD.leftEdge, y, anchor: true, preset: true });
+    a.push({ id: 'R' + y, x: WORLD.rightEdge, y, anchor: true, preset: true });
+  }
+  return a;
+}
+let design = { nodes: presetAnchors(), beams: [] };
+let history = [];
+let tool = 'road';
+let sim = null;
+let banner = null;
+let particles = [];
+let pending = null; // {nodeId} start of beam
+let hover = null;   // world point
+let dragging = false;
+let time = 0;
+
+function snapshot() { return JSON.parse(JSON.stringify(design)); }
+function commit() { history.push(snapshot()); if (history.length > 120) history.shift(); }
+function save() { try { localStorage.setItem('island-span-design', JSON.stringify(design)); } catch (e) {} }
+function load() {
+  try {
+    const s = localStorage.getItem('island-span-design');
+    if (s) { const d = JSON.parse(s); if (d && d.nodes && d.beams) return d; }
+  } catch (e) {}
+  return null;
+}
+function fixUid() {
+  for (const n of design.nodes) { const k = parseInt(String(n.id).slice(1)); if (k >= uid) uid = k + 1; }
+  for (const b of design.beams) { const k = parseInt(String(b.id).slice(1)); if (k >= uid) uid = k + 1; }
+}
+
+// ---------- camera ----------
+let W = 0, H = 0, DPR = 1;
+const cam = { x: 12, y: 2, s: 20 };
+let fitX = 12;
+let userCam = false;
+function fit() {
+  const topPad = 64, botPad = 140;
+  const vw = W, vh = Math.max(200, H - topPad - botPad);
+  const s = Math.min(vw / 42, vh / 24);
+  cam.s = s; cam.x = fitX = 12; cam.y = 3 + (botPad - topPad) / 2 / s;
+}
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  if (!userCam) fit();
+}
+const toS = (x, y) => [(x - cam.x) * cam.s + W / 2, (y - cam.y) * cam.s + H / 2];
+const toW = (sx, sy) => [(sx - W / 2) / cam.s + cam.x, (sy - H / 2) / cam.s + cam.y];
+
+// ---------- helpers ----------
+const nodeById = id => design.nodes.find(n => n.id === id);
+function nearestNode(x, y, rad) {
+  let best = null, bd = rad;
+  for (const n of design.nodes) { const d = Math.hypot(n.x - x, n.y - y); if (d < bd) { bd = d; best = n; } }
+  return best;
+}
+function distSeg(px, py, ax, ay, bx, by) {
+  const ex = bx - ax, ey = by - ay, l2 = ex * ex + ey * ey || 1e-9;
+  let t = ((px - ax) * ex + (py - ay) * ey) / l2; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - ax - ex * t, py - ay - ey * t);
+}
+function insideRock(x, y) { return y > WORLD.top + 0.01 && (x < WORLD.leftEdge - 0.01 || x > WORLD.rightEdge + 0.01); }
+function pickRadius() { return Math.max(0.45, 14 / cam.s); }
+
+// compute endpoint of a beam drag
+function resolveEnd(start, wx, wy) {
+  const mat = MATERIALS[tool];
+  let node = nearestNode(wx, wy, pickRadius());
+  let x, y;
+  if (node && node.id !== start.id) { x = node.x; y = node.y; }
+  else { node = null; x = Math.round(wx); y = Math.round(wy); }
+  let L = Math.hypot(x - start.x, y - start.y);
+  let clamped = false;
+  if (L > mat.maxLen + 1e-6) {
+    node = null; clamped = true;
+    const k = mat.maxLen / L; x = start.x + (x - start.x) * k; y = start.y + (y - start.y) * k;
+    // prefer a grid point within reach
+    const gx = Math.round(x), gy = Math.round(y);
+    if (Math.hypot(gx - start.x, gy - start.y) <= mat.maxLen) { x = gx; y = gy; }
+    L = Math.hypot(x - start.x, y - start.y);
+    const n2 = nearestNode(x, y, 0.2); if (n2 && n2.id !== start.id) { node = n2; x = n2.x; y = n2.y; }
+  }
+  let valid = L > 0.4;
+  let why = '';
+  if (!node && insideRock(x, y)) { valid = false; why = 'Inside rock'; }
+  let layer = 1;
+  if (node) {
+    const here = design.beams.filter(b => (b.a === start.id && b.b === node.id) || (b.b === start.id && b.a === node.id));
+    layer = here.length + 1;
+    if (here.length >= MAX_LAYERS) { valid = false; why = `Already ${MAX_LAYERS} layers here`; }
+    else if (tool === 'hydraulics' && here.length) { valid = false; why = 'Pistons can\'t be layered'; }
+    else if (here.some(b => b.mat === 'hydraulics')) { valid = false; why = 'Pistons can\'t be layered'; }
+  }
+  if (y > WORLD.seabed) { valid = false; why = 'Below the seabed'; }
+  return { x, y, node, L, valid, why, clamped, layer };
+}
+
+// where a dragged joint may go: snapped to a half-metre grid, clear of rock and other joints,
+// and close enough that every attached part stays within its maximum length
+function tryMove(n, wx, wy) {
+  const x = Math.round(wx * 2) / 2, y = Math.round(wy * 2) / 2;
+  if (insideRock(x, y)) return { why: 'Inside rock' };
+  if (y > WORLD.seabed) return { why: 'Below the seabed' };
+  for (const m of design.nodes) if (m !== n && Math.hypot(m.x - x, m.y - y) < 0.3) return { why: 'Another joint is there' };
+  for (const b of design.beams) {
+    if (b.a !== n.id && b.b !== n.id) continue;
+    const o = nodeById(b.a === n.id ? b.b : b.a);
+    const L = Math.hypot(o.x - x, o.y - y);
+    if (L < 0.4) return { why: 'Too short' };
+  }
+  return { x, y };
+}
+let moving = null;
+function overLong(b) {
+  const A = nodeById(b.a), B = nodeById(b.b);
+  return Math.hypot(B.x - A.x, B.y - A.y) > MATERIALS[b.mat].maxLen + 1e-6;
+}
+
+function addBeam(start, end) {
+  commit();
+  let endNode = end.node;
+  if (!endNode) { endNode = { id: newId('n'), x: +end.x.toFixed(3), y: +end.y.toFixed(3) }; design.nodes.push(endNode); }
+  design.beams.push({ id: newId('b'), a: start.id, b: endNode.id, mat: tool });
+  changed();
+  return endNode;
+}
+function placeFoundation(wx, wy) {
+  const x = Math.round(wx), y = Math.round(wy);
+  const existing = nearestNode(x, y, 0.3);
+  if (existing) {
+    if (existing.anchor) { flashHint('There is already a fixed point here'); return; }
+    commit(); existing.anchor = true; existing.foundation = true; changed(); burst(x, y, PALETTE.foundation, 10); return;
+  }
+  if (insideRock(x, y)) { flashHint('Foundations go on the island surface, the cliff face or in the water'); return; }
+  if (y > WORLD.seabed) return;
+  commit();
+  design.nodes.push({ id: newId('n'), x, y, anchor: true, foundation: true });
+  changed(); burst(x, y, PALETTE.foundation, 10);
+}
+function pistonAt(wx, wy, beams, posOf) {
+  let best = null, bd = Math.max(0.5, 14 / cam.s);
+  for (const b of beams) {
+    if (b.mat !== 'hydraulics' || b.broken) continue;
+    const [A, B] = posOf(b);
+    const d = distSeg(wx, wy, A.x, A.y, B.x, B.y);
+    if (d < bd) { bd = d; best = b; }
+  }
+  return best;
+}
+function togglePiston(db) {
+  db.off = !db.off;
+  if (sim) { const sb = sim.beams.find(b => b.id === db.id); if (sb) sb.off = db.off; }
+  save(); updatePistonCount();
+  flashHint(db.off ? 'Piston switched off · it holds its length and ignores the slider' : 'Piston switched on · it follows the slider again');
+}
+function updatePistonCount() {
+  const all = design.beams.filter(b => b.mat === 'hydraulics');
+  const on = all.filter(b => !b.off).length;
+  const el = $('pistonCount'); if (el) el.textContent = all.length ? `${on} of ${all.length} on` : '';
+}
+function eraseAt(wx, wy) {
+  const n = nearestNode(wx, wy, pickRadius() * 0.8);
+  if (n && !n.preset) {
+    commit();
+    design.beams = design.beams.filter(b => b.a !== n.id && b.b !== n.id);
+    design.nodes = design.nodes.filter(m => m !== n);
+    prune(); changed(); burst(n.x, n.y, '#cfd6d8', 8); return;
+  }
+  let best = null, bd = Math.max(0.35, 10 / cam.s);
+  const offs = layerOffsets(design.beams, b => pairKey(b.a, b.b));
+  for (const b of design.beams) {
+    const A = nodeById(b.a), B = nodeById(b.b);
+    const [x1, y1, x2, y2] = shifted(A.x, A.y, B.x, B.y, offs.get(b));
+    const d = distSeg(wx, wy, x1, y1, x2, y2) - DRAW_ORDER.indexOf(b.mat) * 0.001; // ties go to the top layer
+    if (d < bd) { bd = d; best = b; }
+  }
+  if (best) {
+    commit();
+    const A = nodeById(best.a), B = nodeById(best.b);
+    design.beams = design.beams.filter(b => b !== best);
+    prune(); changed(); burst((A.x + B.x) / 2, (A.y + B.y) / 2, PALETTE[best.mat], 8);
+  }
+}
+function prune() {
+  const used = new Set(); for (const b of design.beams) { used.add(b.a); used.add(b.b); }
+  design.nodes = design.nodes.filter(n => n.anchor || used.has(n.id));
+  if (pending && !nodeById(pending.id)) pending = null;
+}
+function changed() { save(); updateCost(); }
+function updateCost() {
+  $('cost').textContent = '$' + designCost(design).toLocaleString('en-US');
+  const parts = design.beams.length + design.nodes.filter(n => n.foundation).length;
+  $('count').textContent = parts + (parts === 1 ? ' part' : ' parts');
+  $('undo').disabled = history.length === 0 || !!sim;
+}
+
+// ---------- example ----------
+function loadExample() {
+  commit();
+  const d = { nodes: presetAnchors(), beams: [] };
+  const id = (x, y) => { let n = d.nodes.find(n => n.x === x && n.y === y); if (!n) { n = { id: newId('n'), x, y }; d.nodes.push(n); } return n.id; };
+  const beam = (a, b, mat) => d.beams.push({ id: newId('b'), a, b, mat });
+  const deck = []; for (let i = 0; i <= 6; i++) deck.push(id(i * 4, 0));
+  for (let i = 0; i < 6; i++) beam(deck[i], deck[i + 1], 'road');
+  const top = []; for (let i = 0; i < 6; i++) top.push(id(i * 4 + 2, -3));
+  for (let i = 0; i < 6; i++) { beam(deck[i], top[i], 'wood'); beam(deck[i + 1], top[i], 'wood'); }
+  for (let i = 0; i < 5; i++) beam(top[i], top[i + 1], 'wood');
+  const pier = { id: newId('n'), x: 12, y: 4, anchor: true, foundation: true }; d.nodes.push(pier);
+  beam(deck[3], pier.id, 'steel'); beam(deck[2], pier.id, 'steel'); beam(deck[4], pier.id, 'steel');
+  design = d; pending = null; changed();
+}
+
+// ---------- simulation control ----------
+function startSim() {
+  const bad = design.beams.filter(overLong).length;
+  if (bad) { flashHint(`${bad} part${bad > 1 ? 's are' : ' is'} stretched past max length (shown in red) · move the joints closer first`); return; }
+  pending = null;
+  $('boatPanel').hidden = true; $('boatsBtn').setAttribute('aria-expanded', 'false');
+  const vk = $('vehicle').value;
+  sim = createSim(design, vk === 'none' ? null : vk);
+  sim.pistonTarget = +$('hydro').value / 100;
+  sim.cost = designCost(design);
+  sim.splashed = false;
+  sim.reported = false;
+  banner = null; $('banner').hidden = true;
+  $('play').textContent = '■ Stop'; $('play').classList.add('stop');
+  $('simhud').hidden = false; $('stall').hidden = true;
+  setBrake(false); $('brake').hidden = !sim.vehicle;
+  $('hydroWrap').hidden = !design.beams.some(b => b.mat === 'hydraulics');
+  updatePistonCount();
+  $('strip').hidden = true;
+  updateHint(); updateCost();
+}
+function stopSim() {
+  sim = null; particles = []; popups = []; $('stall').hidden = true;
+  if (!userCam) fit();
+  $('banner').hidden = true;
+  $('play').textContent = '▶ Test'; $('play').classList.remove('stop');
+  $('simhud').hidden = true; $('strip').hidden = false;
+  $('hydro').value = 100; $('hydroVal').textContent = '100%';
+  updateHint(); updateCost();
+}
+function showBanner(ok) {
+  $('banner').hidden = false;
+  $('banner').classList.toggle('fail', !ok);
+  const v = VEHICLES[sim.vehicleKey].name.toLowerCase();
+  $('bTitle').textContent = ok ? 'Made it across' : 'Into the strait';
+  $('bText').textContent = ok
+    ? `The ${v} reached the far island. Bridge cost $${sim.cost.toLocaleString('en-US')}, peak stress ${Math.round(sim.peak * 100)}%${sim.bestAir > 0.35 ? `, best jump ${sim.bestAir.toFixed(1)} s` : ''}.`
+    : (sim.breaks ? `${sim.breaks} part${sim.breaks > 1 ? 's' : ''} snapped and the ${v} fell in.` : `The ${v} found a gap and fell in. Check that road connects both islands.`);
+}
+
+// ---------- particles ----------
+function burst(x, y, color, n, spd = 3) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = spd * (0.3 + Math.random());
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1.5, life: 0.6 + Math.random() * 0.6, max: 1.2, color, r: 0.06 + Math.random() * 0.08 });
+  }
+}
+function splash(x) {
+  for (let i = 0; i < 26; i++) {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.4, s = 3 + Math.random() * 5;
+    particles.push({ x: x + (Math.random() - 0.5) * 2, y: WORLD.water, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.8 + Math.random() * 0.6, max: 1.4, color: '#e6f3f5', r: 0.08 + Math.random() * 0.12, water: true });
+  }
+}
+
+// ---------- layers ----------
+const MAX_LAYERS = 4, LAYER_GAP = 0.24;
+const DRAW_ORDER = ['rope', 'cable', 'spring', 'hydraulics', 'wood', 'steel', 'road'];
+// Parts sharing the same two joints are drawn side by side so every layer stays visible.
+// The road stays on the joint line (that's where wheels ride); other layers fan out around it.
+function layerOffsets(beams, keyOf) {
+  const groups = new Map(), off = new Map();
+  for (const b of beams) { const k = keyOf(b); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(b); }
+  for (const g of groups.values()) {
+    if (g.length === 1) { off.set(g[0], 0); continue; }
+    g.sort((p, q) => DRAW_ORDER.indexOf(q.mat) - DRAW_ORDER.indexOf(p.mat));
+    const roads = g.filter(b => b.mat === 'road'), rest = g.filter(b => b.mat !== 'road');
+    if (roads.length) {
+      roads.forEach((b, i) => off.set(b, i === 0 ? 0 : -(i) * LAYER_GAP * 1.6));
+      rest.forEach((b, i) => off.set(b, (i + 1) * LAYER_GAP));
+    } else g.forEach((b, i) => off.set(b, (i - (g.length - 1) / 2) * LAYER_GAP));
+  }
+  return off;
+}
+function shifted(ax, ay, bx, by, o) {
+  if (!o) return [ax, ay, bx, by];
+  const L = Math.hypot(bx - ax, by - ay) || 1;
+  let nx = -(by - ay) / L, ny = (bx - ax) / L;
+  if (ny < 0 || (ny === 0 && nx < 0)) { nx = -nx; ny = -ny; } // positive offsets go below the joint line
+  return [ax + nx * o, ay + ny * o, bx + nx * o, by + ny * o];
+}
+const pairKey = (a, b) => a < b ? a + '|' + b : b + '|' + a;
+
+// ---------- drawing ----------
+function rnd(seed) { const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+function drawSky() {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  const [, hy] = toS(0, WORLD.water);
+  const hz = Math.max(0.2, Math.min(0.95, hy / H));
+  g.addColorStop(0, '#7fb8cc'); g.addColorStop(hz * 0.7, '#b9dbe0'); g.addColorStop(hz, '#ecebd9'); g.addColorStop(1, '#ecebd9');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // sun
+  const [sx, sy] = toS(34, -12);
+  const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, cam.s * 9);
+  sg.addColorStop(0, '#fff6dcdd'); sg.addColorStop(0.15, '#fff1cf88'); sg.addColorStop(1, '#fff1cf00');
+  ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
+  // clouds (slow drift)
+  ctx.fillStyle = '#ffffffb0';
+  for (let i = 0; i < 6; i++) {
+    const cx = ((rnd(i) * 80 - 30 + time * (0.3 + rnd(i + 9) * 0.3)) % 90) - 30;
+    const cy = -16 + rnd(i + 3) * 9;
+    const [px, py] = toS(cx, cy);
+    const w = (4 + rnd(i + 5) * 6) * cam.s;
+    ctx.beginPath();
+    ctx.ellipse(px, py, w * 0.5, w * 0.12, 0, 0, Math.PI * 2);
+    ctx.ellipse(px - w * 0.18, py - w * 0.06, w * 0.22, w * 0.11, 0, 0, Math.PI * 2);
+    ctx.ellipse(px + w * 0.12, py - w * 0.08, w * 0.2, w * 0.13, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // far islands in haze
+  ctx.fillStyle = '#9fbfc2';
+  const [, wy] = toS(0, WORLD.water);
+  for (const [cx, w, h] of [[-4, 30, 4.5], [30, 22, 3], [56, 34, 5.5]]) {
+    const [px] = toS(cx, 0);
+    ctx.beginPath(); ctx.moveTo(px - w / 2 * cam.s, wy);
+    for (let i = 0; i <= 20; i++) {
+      const t = i / 20; const x = px + (t - 0.5) * w * cam.s;
+      const y = wy - Math.sin(t * Math.PI) * h * cam.s * (0.8 + 0.2 * Math.sin(t * 13 + cx));
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+}
+function drawWaterBack() {
+  const [, wy] = toS(0, WORLD.water);
+  const [, by] = toS(0, WORLD.seabed);
+  const g = ctx.createLinearGradient(0, wy, 0, by);
+  g.addColorStop(0, '#3f8ea3'); g.addColorStop(1, '#123b4c');
+  ctx.fillStyle = g; ctx.fillRect(0, wy, W, H - wy);
+  // seabed
+  const [lx] = toS(WORLD.leftEdge, 0), [rx] = toS(WORLD.rightEdge, 0);
+  ctx.fillStyle = '#3d4a44';
+  ctx.beginPath(); ctx.moveTo(lx, by);
+  for (let i = 0; i <= 24; i++) { const x = lx + (rx - lx) * i / 24; ctx.lineTo(x, by - Math.sin(i * 1.7) * 0.15 * cam.s); }
+  ctx.lineTo(rx, H); ctx.lineTo(lx, H); ctx.closePath(); ctx.fill();
+}
+function drawWaterFront() {
+  const [, wy] = toS(0, WORLD.water);
+  ctx.fillStyle = '#2f7d93a8';
+  ctx.beginPath(); ctx.moveTo(0, H);
+  for (let x = 0; x <= W + 8; x += 8) {
+    const wx = toW(x, 0)[0];
+    ctx.lineTo(x, wy + Math.sin(wx * 0.9 + time * 1.6) * 0.08 * cam.s + Math.sin(wx * 2.3 - time * 2.1) * 0.04 * cam.s);
+  }
+  ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+  // surface glints
+  ctx.strokeStyle = '#d9f0f2aa'; ctx.lineWidth = Math.max(1, cam.s * 0.05);
+  for (let i = 0; i < 18; i++) {
+    const gx = WORLD.leftEdge + 0.5 + ((rnd(i) * 23 + time * 0.4 * (rnd(i + 2) - 0.5)) % 23 + 23) % 23;
+    const [px, py] = toS(gx, WORLD.water + 0.3 + rnd(i + 7) * 3);
+    const w = (0.4 + rnd(i + 4)) * cam.s;
+    ctx.globalAlpha = 0.25 + 0.25 * Math.sin(time * 1.5 + i);
+    ctx.beginPath(); ctx.moveTo(px - w / 2, py); ctx.lineTo(px + w / 2, py); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+function islandShape(side) {
+  // returns screen polygon points for an island; cliff face jags only into the rock
+  const pts = [];
+  const edge = side < 0 ? WORLD.leftEdge : WORLD.rightEdge;
+  const far = side < 0 ? -80 : 110;
+  pts.push(toS(far, WORLD.top));
+  pts.push(toS(edge, WORLD.top));
+  for (let i = 1; i <= 26; i++) {
+    const y = WORLD.top + i * (WORLD.seabed + 2) / 26;
+    const j = (rnd(i * (side + 3)) * 0.9 + Math.max(0, y - 8) * 0.12) * (y > 0.5 ? 1 : 0);
+    pts.push(toS(edge + side * j, y));
+  }
+  pts.push(toS(edge + side * 2, WORLD.seabed + 60));
+  pts.push(toS(far, WORLD.seabed + 60));
+  return pts;
+}
+function drawIsland(side) {
+  const pts = islandShape(side);
+  const [, ty] = toS(0, WORLD.top), [, by] = toS(0, WORLD.seabed);
+  const g = ctx.createLinearGradient(0, ty, 0, by);
+  g.addColorStop(0, '#9a7a56'); g.addColorStop(0.5, '#7e6247'); g.addColorStop(1, '#4d3f33');
+  ctx.fillStyle = g;
+  ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill();
+  // strata
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#5e4a3655'; ctx.lineWidth = Math.max(1, cam.s * 0.06);
+  for (let k = 1; k < 9; k++) {
+    const y0 = k * 2.2 + 0.6;
+    ctx.beginPath();
+    for (let i = 0; i <= 40; i++) {
+      const x = (side < 0 ? -40 : WORLD.rightEdge) + i;
+      const [px, py] = toS(x, y0 + Math.sin(x * 0.35 + k) * 0.25 + (side < 0 ? 1 : -1) * x * 0.02);
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+  // grass cap
+  const edge = side < 0 ? WORLD.leftEdge : WORLD.rightEdge;
+  const far = side < 0 ? -80 : 110;
+  const [ex] = toS(edge, 0), [fx] = toS(far, 0);
+  ctx.fillStyle = '#6d9a49';
+  ctx.fillRect(Math.min(ex, fx), ty, Math.abs(fx - ex), cam.s * 0.55);
+  ctx.fillStyle = '#5c8740';
+  ctx.fillRect(Math.min(ex, fx), ty + cam.s * 0.45, Math.abs(fx - ex), cam.s * 0.12);
+  // island road surface, following the lumps
+  ctx.fillStyle = '#44484c';
+  const roadStart = side < 0 ? -80 : WORLD.rightEdge, roadEnd = side < 0 ? WORLD.leftEdge : 110;
+  const [r1] = toS(roadStart, 0), [r2] = toS(roadEnd, 0);
+  ctx.fillRect(r1, ty, r2 - r1, cam.s * 0.3);
+  for (const b of BUMPS) {
+    if ((side < 0) !== (b.x < WORLD.leftEdge)) continue;
+    const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2;
+    ctx.beginPath();
+    let [px, py] = toS(x0, 0); ctx.moveTo(px, py + 1);
+    for (let x = x0; x <= x1 + 1e-6; x += b.w / 24) { [px, py] = toS(x, groundY(x)); ctx.lineTo(px, py); }
+    [px, py] = toS(x1, 0); ctx.lineTo(px, py + 1); ctx.closePath();
+    ctx.fillStyle = '#44484c'; ctx.fill();
+    // hazard chevrons on each lump
+    ctx.save(); ctx.clip();
+    const [cx0, cy0] = toS(x0, -b.h), [cx1] = toS(x1, 0);
+    for (let i = -2, k = 0; cx0 + i * cam.s * 0.4 < cx1; i++, k++) {
+      ctx.fillStyle = k % 2 ? '#1d2024' : '#e8c24a';
+      const xx = cx0 + i * cam.s * 0.4;
+      ctx.beginPath(); ctx.moveTo(xx, cy0); ctx.lineTo(xx + cam.s * 0.4, cy0); ctx.lineTo(xx + cam.s * 0.4 + b.h * cam.s, ty); ctx.lineTo(xx + b.h * cam.s, ty); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.strokeStyle = '#e8c24a'; ctx.lineWidth = Math.max(1, cam.s * 0.05);
+  ctx.setLineDash([cam.s * 0.6, cam.s * 0.6]);
+  ctx.beginPath(); ctx.moveTo(r1, ty + cam.s * 0.15); ctx.lineTo(r2, ty + cam.s * 0.15); ctx.stroke();
+  ctx.setLineDash([]);
+  // trees
+  for (let i = 0; i < 7; i++) {
+    const tx = side < 0 ? -3 - i * 2.6 - rnd(i) * 1.5 : WORLD.rightEdge + 3 + i * 2.4 + rnd(i + 1) * 1.5;
+    if (side > 0 && tx > 27 && tx < 33) continue;
+    const h = 2.4 + rnd(i + 11) * 2.2;
+    const [bx, byy] = toS(tx, WORLD.top - 0.1);
+    ctx.fillStyle = '#4a3527';
+    ctx.fillRect(bx - cam.s * 0.08, byy - cam.s * 0.7, cam.s * 0.16, cam.s * 0.7);
+    ctx.fillStyle = i % 2 ? '#3f6b3c' : '#4b7a44';
+    for (let k = 0; k < 3; k++) {
+      const w = (1.1 - k * 0.25) * cam.s, y1 = byy - cam.s * (0.5 + k * h * 0.26), y2 = y1 - h * 0.45 * cam.s;
+      ctx.beginPath(); ctx.moveTo(bx - w, y1); ctx.lineTo(bx + w, y1); ctx.lineTo(bx, y2); ctx.closePath(); ctx.fill();
+    }
+  }
+}
+function drawSigns() {
+  // goal flag
+  const [fx, fy] = toS(WORLD.rightEdge + 6, WORLD.top);
+  ctx.strokeStyle = '#2a3238'; ctx.lineWidth = Math.max(1.5, cam.s * 0.1);
+  ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - cam.s * 4); ctx.stroke();
+  const fw = cam.s * 1.6, fh = cam.s * 1.0, c = 4;
+  for (let i = 0; i < c; i++) for (let j = 0; j < 2; j++) {
+    ctx.fillStyle = (i + j) % 2 ? '#1b1f22' : '#f4f4f0';
+    const wav = Math.sin(time * 4 + i) * cam.s * 0.06;
+    ctx.fillRect(fx + i * fw / c, fy - cam.s * 4 + j * fh / 2 + wav, fw / c + 0.5, fh / 2 + 0.5);
+  }
+  // gap dimension (engineering drawing)
+  if (!sim) {
+    const y = -8.5;
+    const [ax, ay] = toS(WORLD.leftEdge, y), [bx] = toS(WORLD.rightEdge, y);
+    ctx.strokeStyle = '#15222a99'; ctx.fillStyle = '#15222acc'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, ay);
+    ctx.moveTo(ax, ay - 6); ctx.lineTo(ax, ay + 6); ctx.moveTo(bx, ay - 6); ctx.lineTo(bx, ay + 6); ctx.stroke();
+    ctx.font = `600 ${Math.max(11, Math.min(15, cam.s * 0.6))}px Archivo, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(`${WORLD.rightEdge - WORLD.leftEdge} m span`, (ax + bx) / 2, ay - 4);
+  }
+}
+function drawGrid() {
+  const [x0, y0] = toW(0, 0), [x1, y1] = toW(W, H);
+  ctx.lineWidth = 1;
+  for (let x = Math.floor(x0); x <= x1; x++) {
+    const major = x % 4 === 0;
+    ctx.strokeStyle = major ? '#15222a26' : '#15222a12';
+    const [px] = toS(x, 0);
+    ctx.beginPath(); ctx.moveTo(Math.round(px) + 0.5, 0); ctx.lineTo(Math.round(px) + 0.5, H); ctx.stroke();
+  }
+  for (let y = Math.floor(y0); y <= y1; y++) {
+    const major = y % 4 === 0;
+    ctx.strokeStyle = major ? '#15222a26' : '#15222a12';
+    const [, py] = toS(0, y);
+    ctx.beginPath(); ctx.moveTo(0, Math.round(py) + 0.5); ctx.lineTo(W, Math.round(py) + 0.5); ctx.stroke();
+  }
+}
+function stressColor(s) {
+  s = Math.max(0, Math.min(1, s));
+  const h = 125 - 125 * s;
+  return `hsl(${h}, 70%, ${45 + 5 * s}%)`;
+}
+function drawBeam(ax, ay, bx, by, mat, opt = {}) {
+  const [x1, y1] = toS(ax, ay), [x2, y2] = toS(bx, by);
+  const m = MATERIALS[mat];
+  const w = Math.max(1.5, m.width * cam.s);
+  ctx.lineCap = 'round';
+  const sc = opt.stress !== undefined ? stressColor(opt.stress) : null;
+  if (opt.ghost) ctx.globalAlpha = 0.6;
+  if (mat === 'road') {
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = '#25282b'; ctx.lineWidth = w + 2;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.strokeStyle = sc || PALETTE.road; ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (!sc) {
+      ctx.strokeStyle = '#e8c24a'; ctx.lineWidth = Math.max(1, w * 0.12);
+      ctx.setLineDash([cam.s * 0.45, cam.s * 0.45]);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]);
+    }
+  } else if (mat === 'wood') {
+    ctx.strokeStyle = '#6b4724'; ctx.lineWidth = w + 2;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.strokeStyle = sc || PALETTE.wood; ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (!sc) { ctx.strokeStyle = '#d9ad74'; ctx.lineWidth = Math.max(1, w * 0.25); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+  } else if (mat === 'steel') {
+    ctx.lineCap = 'square';
+    ctx.strokeStyle = '#2d3843'; ctx.lineWidth = w + 2;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.strokeStyle = sc || PALETTE.steel; ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (!sc) { ctx.strokeStyle = '#9fb2c1'; ctx.lineWidth = Math.max(1, w * 0.22); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+  } else if (mat === 'rope') {
+    ctx.strokeStyle = sc || PALETTE.rope; ctx.lineWidth = Math.max(1.5, w * 1.2);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (!sc) {
+      ctx.strokeStyle = '#d8b67e'; ctx.lineWidth = Math.max(1, w * 0.6); ctx.setLineDash([cam.s * 0.12, cam.s * 0.14]);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]);
+    }
+  } else if (mat === 'cable') {
+    ctx.strokeStyle = sc || PALETTE.cable; ctx.lineWidth = Math.max(1.5, w * 1.2);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  } else if (mat === 'spring') {
+    // a coil: short straight ends, zigzag in between; more coils for longer springs, squeezed coils when compressed
+    const L = Math.hypot(x2 - x1, y2 - y1) || 1;
+    const ux = (x2 - x1) / L, uy = (y2 - y1) / L, nx = -uy, ny = ux;
+    const base = opt.base || Math.hypot(bx - ax, by - ay);
+    const coils = Math.max(4, Math.round(base * 2.6));
+    const amp = Math.max(3, cam.s * 0.24);
+    const end = Math.min(L * 0.12, cam.s * 0.3);
+    ctx.lineJoin = 'round';
+    const pts = [[x1, y1], [x1 + ux * end, y1 + uy * end]];
+    for (let i = 0; i < coils * 2; i++) {
+      const t = end + (L - 2 * end) * (i + 0.5) / (coils * 2);
+      const side = i % 2 ? -1 : 1;
+      pts.push([x1 + ux * t + nx * amp * side, y1 + uy * t + ny * amp * side]);
+    }
+    pts.push([x2 - ux * end, y2 - uy * end], [x2, y2]);
+    for (const [col, lw] of [['#16334d', Math.max(2.5, cam.s * 0.11)], [sc || PALETTE.spring, Math.max(1.5, cam.s * 0.07)]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = lw;
+      ctx.beginPath(); pts.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.stroke();
+    }
+    ctx.lineJoin = 'miter';
+  } else if (mat === 'hydraulics') {
+    const base = opt.base || Math.hypot(bx - ax, by - ay);
+    const L = Math.hypot(bx - ax, by - ay) || 1;
+    const k = Math.min(0.92, (base * 0.55) / L);
+    const mx = x1 + (x2 - x1) * k, my = y1 + (y2 - y1) * k;
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = '#c9d3d9'; ctx.lineWidth = Math.max(1.5, w * 0.45);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.strokeStyle = '#7d2f12'; ctx.lineWidth = w + 2;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(mx, my); ctx.stroke();
+    ctx.strokeStyle = opt.off ? '#7d8790' : (sc || PALETTE.hydraulics); ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(mx, my); ctx.stroke();
+  }
+  ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+}
+// small label pinned to a piston's middle: OFF (grey) or STALLED (pulsing orange)
+function drawPistonTag(ax, ay, bx, by, kind) {
+  const [x1, y1] = toS(ax, ay), [x2, y2] = toS(bx, by);
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const text = kind === 'off' ? 'OFF' : 'STALLED';
+  ctx.font = '700 11px Archivo, sans-serif';
+  const tw = ctx.measureText(text).width + 12;
+  if (kind === 'stalled') {
+    const pulse = 0.5 + 0.5 * Math.sin(time * 8);
+    ctx.strokeStyle = `rgba(240,138,36,${0.35 + 0.5 * pulse})`; ctx.lineWidth = Math.max(6, cam.s * 0.5); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.lineCap = 'butt';
+  }
+  ctx.fillStyle = kind === 'off' ? '#3a434b' : '#f08a24';
+  ctx.fillRect(mx - tw / 2, my - 9, tw, 18);
+  ctx.fillStyle = kind === 'off' ? '#e3e8ea' : '#1a1206';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, mx, my + 0.5);
+}
+function drawFoundation(x, y) {
+  const ground = (x <= WORLD.leftEdge + 0.01 || x >= WORLD.rightEdge - 0.01) && y <= WORLD.top ? WORLD.top : WORLD.seabed;
+  const onCliff = (Math.abs(x - WORLD.leftEdge) < 0.01 || Math.abs(x - WORLD.rightEdge) < 0.01) && y > WORLD.top;
+  const [px, py] = toS(x, y);
+  const hw = 0.5 * cam.s;
+  if (onCliff) {
+    ctx.fillStyle = '#8d938e';
+    const dir = Math.abs(x - WORLD.leftEdge) < 0.01 ? -1 : 1;
+    ctx.fillRect(dir < 0 ? px - hw * 1.6 : px, py - hw, hw * 1.6, hw * 2);
+  } else {
+    const [, gy] = toS(x, ground + (ground === WORLD.top ? 0.3 : 0.4));
+    const g = ctx.createLinearGradient(px - hw, 0, px + hw, 0);
+    g.addColorStop(0, '#8a908b'); g.addColorStop(0.45, '#b9bdb7'); g.addColorStop(1, '#7c827d');
+    ctx.fillStyle = g;
+    ctx.fillRect(px - hw, py - hw * 0.4, hw * 2, gy - py + hw * 0.4);
+    ctx.strokeStyle = '#5f6561'; ctx.lineWidth = 1;
+    ctx.strokeRect(px - hw + 0.5, py - hw * 0.4 + 0.5, hw * 2 - 1, gy - py + hw * 0.4 - 1);
+    // footing
+    ctx.fillStyle = '#7b817c';
+    ctx.fillRect(px - hw * 1.5, gy - cam.s * 0.4, hw * 3, cam.s * 0.4);
+    // form-tie marks
+    ctx.fillStyle = '#6a706b';
+    for (let yy = py + cam.s; yy < gy - cam.s * 0.6; yy += cam.s * 1.5) { ctx.fillRect(px - hw * 0.5, yy, 2, 2); ctx.fillRect(px + hw * 0.5, yy, 2, 2); }
+  }
+}
+function drawNode(x, y, n, highlight) {
+  const [px, py] = toS(x, y);
+  if (n.anchor) {
+    const r = Math.max(5, cam.s * 0.24);
+    ctx.fillStyle = '#20282e'; ctx.fillRect(px - r, py - r, r * 2, r * 2);
+    ctx.fillStyle = n.foundation ? '#c7ccc6' : '#f08a24';
+    ctx.fillRect(px - r * 0.45, py - r * 0.45, r * 0.9, r * 0.9);
+  } else {
+    const r = Math.max(3.5, cam.s * 0.14);
+    ctx.fillStyle = '#e9edec'; ctx.strokeStyle = '#2a3238'; ctx.lineWidth = Math.max(1.2, cam.s * 0.05);
+    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+  if (highlight) {
+    ctx.strokeStyle = '#f08a24'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(px, py, Math.max(9, cam.s * 0.42), 0, Math.PI * 2); ctx.stroke();
+  }
+}
+function drawVehicle() {
+  if (!sim || !sim.vehicle) return;
+  const N = sim.nodes, ids = sim.carNodes, v = sim.vehicle;
+  const w1 = N[ids[0]], w2 = N[ids[1]], r1 = N[ids[2]], r2 = N[ids[3]];
+  const ang = Math.atan2(w2.y - w1.y, w2.x - w1.x);
+  const cx = (w1.x + w2.x + r1.x + r2.x) / 4, cy = (w1.y + w2.y + r1.y + r2.y) / 4;
+  const [sx, sy] = toS(cx, cy);
+  const s = cam.s;
+  ctx.save(); ctx.translate(sx, sy); ctx.rotate(ang);
+  const L = (v.wheelbase + 1.4) * s, Hh = v.height * s;
+  const key = sim.vehicleKey;
+  ctx.lineJoin = 'round';
+  if (key === 'bike') {
+    // wheels sit at (±wheelbase/2, +Hh/2) in this frame
+    const wb = v.wheelbase * s, ax = Hh / 2;
+    const spd = Math.hypot(w1.vx, w1.vy);
+    if (spd > 6) { // speed streaks
+      ctx.strokeStyle = '#ffffff'; ctx.lineCap = 'round';
+      for (let i = 0; i < 4; i++) {
+        const len = (spd / 20) * s * (1.6 + i * 0.5);
+        ctx.globalAlpha = 0.18 + 0.12 * Math.sin(time * 30 + i * 2);
+        ctx.lineWidth = Math.max(1, s * 0.05);
+        const yy = -Hh * 0.6 + i * Hh * 0.32;
+        ctx.beginPath(); ctx.moveTo(-wb * 0.75 - s * 0.2, yy); ctx.lineTo(-wb * 0.75 - s * 0.2 - len, yy); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.lineCap = 'round';
+    // frame and fork
+    ctx.strokeStyle = '#2a2f35'; ctx.lineWidth = Math.max(1.5, s * 0.1);
+    ctx.beginPath(); ctx.moveTo(-wb / 2, ax); ctx.lineTo(-wb * 0.1, -Hh * 0.05); ctx.lineTo(wb * 0.32, -Hh * 0.2); ctx.lineTo(wb / 2, ax); ctx.stroke();
+    // fairing
+    ctx.fillStyle = '#8e3bd6'; ctx.strokeStyle = '#4a1a78'; ctx.lineWidth = Math.max(1, s * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(-wb * 0.62, -Hh * 0.12); ctx.lineTo(-wb * 0.05, -Hh * 0.2); ctx.lineTo(wb * 0.22, -Hh * 0.42);
+    ctx.lineTo(wb * 0.48, -Hh * 0.22); ctx.lineTo(wb * 0.36, Hh * 0.12); ctx.lineTo(-wb * 0.1, Hh * 0.14); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f2f2ee'; // racing stripe
+    ctx.beginPath(); ctx.moveTo(-wb * 0.5, -Hh * 0.08); ctx.lineTo(wb * 0.3, -Hh * 0.22); ctx.lineTo(wb * 0.3, -Hh * 0.15); ctx.lineTo(-wb * 0.5, -Hh * 0.01); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#bfe3ef'; // windscreen
+    ctx.beginPath(); ctx.moveTo(wb * 0.22, -Hh * 0.42); ctx.lineTo(wb * 0.3, -Hh * 0.7); ctx.lineTo(wb * 0.4, -Hh * 0.3); ctx.closePath(); ctx.fill();
+    // rider, tucked low
+    ctx.strokeStyle = '#1d2329'; ctx.lineWidth = Math.max(2, s * 0.2);
+    ctx.beginPath(); ctx.moveTo(-wb * 0.22, -Hh * 0.3); ctx.lineTo(wb * 0.12, -Hh * 0.72); ctx.stroke(); // torso
+    ctx.lineWidth = Math.max(1.5, s * 0.12);
+    ctx.beginPath(); ctx.moveTo(wb * 0.1, -Hh * 0.68); ctx.lineTo(wb * 0.3, -Hh * 0.42); ctx.stroke(); // arm
+    ctx.beginPath(); ctx.moveTo(-wb * 0.2, -Hh * 0.28); ctx.lineTo(wb * 0.02, Hh * 0.0); ctx.lineTo(-wb * 0.08, Hh * 0.22); ctx.stroke(); // leg
+    ctx.fillStyle = '#f08a24'; // helmet
+    ctx.beginPath(); ctx.arc(wb * 0.2, -Hh * 0.86, Math.max(3, s * 0.2), 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1d2329'; ctx.fillRect(wb * 0.24, -Hh * 0.92, Math.max(2, s * 0.14), Math.max(1.5, s * 0.08));
+  } else if (key === 'car') {
+    ctx.fillStyle = '#d23f33'; ctx.strokeStyle = '#6e1c16'; ctx.lineWidth = Math.max(1, s * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(-L / 2, Hh * 0.35); ctx.lineTo(-L / 2, -Hh * 0.05); ctx.lineTo(-L * 0.28, -Hh * 0.12);
+    ctx.lineTo(-L * 0.15, -Hh * 0.6); ctx.lineTo(L * 0.18, -Hh * 0.6); ctx.lineTo(L * 0.32, -Hh * 0.12);
+    ctx.lineTo(L / 2, -Hh * 0.02); ctx.lineTo(L / 2, Hh * 0.35); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#bfe3ef';
+    ctx.beginPath(); ctx.moveTo(-L * 0.12, -Hh * 0.52); ctx.lineTo(L * 0.16, -Hh * 0.52); ctx.lineTo(L * 0.26, -Hh * 0.14); ctx.lineTo(-L * 0.22, -Hh * 0.14); ctx.closePath(); ctx.fill();
+  } else if (key === 'truck') {
+    ctx.fillStyle = '#e7b43a'; ctx.strokeStyle = '#7a5a12'; ctx.lineWidth = Math.max(1, s * 0.06);
+    ctx.fillRect(-L / 2, -Hh * 0.75, L * 0.68, Hh * 1.05); ctx.strokeRect(-L / 2, -Hh * 0.75, L * 0.68, Hh * 1.05);
+    ctx.fillStyle = '#2f6fa0'; ctx.strokeStyle = '#173a55';
+    ctx.beginPath(); ctx.moveTo(L * 0.2, Hh * 0.3); ctx.lineTo(L * 0.2, -Hh * 0.55); ctx.lineTo(L * 0.38, -Hh * 0.55); ctx.lineTo(L / 2, -Hh * 0.1); ctx.lineTo(L / 2, Hh * 0.3); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#bfe3ef'; ctx.fillRect(L * 0.26, -Hh * 0.45, L * 0.13, Hh * 0.3);
+  } else {
+    ctx.fillStyle = '#2f8f7a'; ctx.strokeStyle = '#174a3f'; ctx.lineWidth = Math.max(1, s * 0.06);
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-L / 2, -Hh * 0.7, L, Hh * 1.0, s * 0.3) : ctx.rect(-L / 2, -Hh * 0.7, L, Hh * 1.0); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#bfe3ef';
+    for (let i = 0; i < 5; i++) ctx.fillRect(-L / 2 + L * (0.06 + i * 0.18), -Hh * 0.55, L * 0.13, Hh * 0.32);
+    ctx.fillStyle = '#f2e9c9'; ctx.fillRect(-L / 2, -Hh * 0.12, L, Hh * 0.08);
+  }
+  ctx.restore();
+  for (const wn of [w1, w2]) {
+    const [wx, wy] = toS(wn.x, wn.y);
+    ctx.fillStyle = '#1c1f22'; ctx.beginPath(); ctx.arc(wx, wy, v.radius * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#9aa3a8'; ctx.beginPath(); ctx.arc(wx, wy, v.radius * s * 0.45, 0, Math.PI * 2); ctx.fill();
+    const a = wn.x / v.radius;
+    ctx.strokeStyle = '#1c1f22'; ctx.lineWidth = Math.max(1, s * 0.05);
+    ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx + Math.cos(a) * v.radius * s * 0.45, wy + Math.sin(a) * v.radius * s * 0.45); ctx.stroke();
+  }
+}
+let popups = [];
+function drawPopups(dt) {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `800 ${Math.max(16, Math.min(30, cam.s * 1.1))}px "Big Shoulders Display", Impact, sans-serif`;
+  for (const p of popups) {
+    p.life -= dt; p.y -= dt * 1.2;
+    const [px, py] = toS(p.x, p.y);
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.5));
+    ctx.lineWidth = 4; ctx.strokeStyle = '#15222a'; ctx.strokeText(p.text.toUpperCase(), px, py);
+    ctx.fillStyle = '#f08a24'; ctx.fillText(p.text.toUpperCase(), px, py);
+  }
+  ctx.globalAlpha = 1;
+  popups = popups.filter(p => p.life > 0);
+}
+function drawParticles(dt) {
+  for (const p of particles) {
+    p.vy += 9.8 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+    if (p.water && p.y > WORLD.water && p.vy > 0) p.life = Math.min(p.life, 0.05);
+    const [px, py] = toS(p.x, p.y);
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max * 1.6));
+    ctx.fillStyle = p.color;
+    ctx.fillRect(px - p.r * cam.s, py - p.r * cam.s, p.r * cam.s * 2, p.r * cam.s * 2);
+  }
+  ctx.globalAlpha = 1;
+  particles = particles.filter(p => p.life > 0);
+}
+
+function render(dt) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  drawSky();
+  drawWaterBack();
+  drawIsland(-1); drawIsland(1);
+  if (!sim) drawGrid();
+  drawSigns();
+  drawBoats('back');
+
+  if (!sim) {
+    for (const n of design.nodes) if (n.foundation) drawFoundation(n.x, n.y);
+    const offs = layerOffsets(design.beams, b => pairKey(b.a, b.b));
+    for (const m of DRAW_ORDER) for (const b of design.beams) if (b.mat === m) {
+      const A = nodeById(b.a), B = nodeById(b.b);
+      const [sx1, sy1, sx2, sy2] = shifted(A.x, A.y, B.x, B.y, offs.get(b));
+      drawBeam(sx1, sy1, sx2, sy2, m, { off: b.off });
+      if (overLong(b)) {
+        const [x1, y1] = toS(A.x, A.y), [x2, y2] = toS(B.x, B.y);
+        ctx.strokeStyle = '#e2564a'; ctx.lineWidth = Math.max(2, cam.s * 0.12); ctx.setLineDash([6, 5]);
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+    // preview
+    const start = pending ? nodeById(pending.id) : null;
+    if (start && hover && tool !== 'erase' && tool !== 'foundation') {
+      const end = resolveEnd(start, hover[0], hover[1]);
+      drawBeam(start.x, start.y, end.x, end.y, tool, { ghost: true });
+      const [px, py] = toS(end.x, end.y), [qx, qy] = toS(start.x, start.y);
+      ctx.strokeStyle = end.valid ? '#f08a24' : '#e2564a'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(px, py); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(px, py, Math.max(5, cam.s * 0.2), 0, Math.PI * 2); ctx.stroke();
+      const label = end.valid ? `${end.layer > 1 ? `Layer ${end.layer} · ` : ''}${end.L.toFixed(1)} m · $${Math.round(end.L * MATERIALS[tool].cost)}${end.clamped ? ' · max' : ''}` : end.why;
+      ctx.font = '600 12px Archivo, sans-serif';
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = '#15222ae6'; ctx.fillRect(px + 12, py - 26, tw + 14, 22);
+      ctx.fillStyle = end.valid ? '#edf3f1' : '#ff9a8f'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, px + 19, py - 15);
+    }
+    if (moving && !moving.why) {
+      const n = nodeById(moving.id);
+      const longs = design.beams.filter(b => (b.a === n.id || b.b === n.id) && overLong(b));
+      if (longs.length) {
+        const b = longs[0];
+        const [px, py] = toS(n.x, n.y);
+        const msg = `${MATERIALS[b.mat].name} too long · max ${MATERIALS[b.mat].maxLen} m`;
+        ctx.font = '600 12px Archivo, sans-serif';
+        const tw = ctx.measureText(msg).width;
+        ctx.fillStyle = '#15222ae6'; ctx.fillRect(px + 14, py - 30, tw + 14, 22);
+        ctx.fillStyle = '#ff9a8f'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(msg, px + 21, py - 19);
+      }
+    }
+    if (moving && moving.why && hover) {
+      const [px, py] = toS(hover[0], hover[1]);
+      ctx.font = '600 12px Archivo, sans-serif';
+      const tw = ctx.measureText(moving.why).width;
+      ctx.fillStyle = '#15222ae6'; ctx.fillRect(px + 12, py - 26, tw + 14, 22);
+      ctx.fillStyle = '#ff9a8f'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(moving.why, px + 19, py - 15);
+    }
+    const hn = moving ? nodeById(moving.id) : (hover ? nearestNode(hover[0], hover[1], pickRadius()) : null);
+    for (const n of design.nodes) drawNode(n.x, n.y, n, (pending && n.id === pending.id) || n === hn);
+    for (const b of design.beams) if (b.mat === 'hydraulics' && b.off) { const A = nodeById(b.a), B = nodeById(b.b); drawPistonTag(A.x, A.y, B.x, B.y, 'off'); }
+    if (hover && tool === 'foundation') {
+      const x = Math.round(hover[0]), y = Math.round(hover[1]);
+      ctx.globalAlpha = 0.45; drawFoundation(x, y); ctx.globalAlpha = 1;
+    }
+  } else {
+    for (const n of design.nodes) if (n.foundation) drawFoundation(n.x, n.y);
+    const sv = $('stressView').checked;
+    const live = sim.beams.filter(b => !b.broken);
+    const offs = layerOffsets(live, b => pairKey(b.a, b.b));
+    for (const m of DRAW_ORDER) for (const b of live) if (b.mat === m) {
+      const A = sim.nodes[b.a], B = sim.nodes[b.b];
+      const [sx1, sy1, sx2, sy2] = shifted(A.x, A.y, B.x, B.y, offs.get(b));
+      drawBeam(sx1, sy1, sx2, sy2, m, { stress: sv && !b.off ? b.avg : undefined, base: b.base, off: b.off });
+    }
+    for (const n of sim.nodes) if (!n.car) drawNode(n.x, n.y, n, false);
+    for (const b of sim.beams) if (b.mat === 'hydraulics' && !b.broken && (b.off || b.jammed)) {
+      const A = sim.nodes[b.a], B = sim.nodes[b.b]; drawPistonTag(A.x, A.y, B.x, B.y, b.off ? 'off' : 'stalled');
+    }
+    drawVehicle();
+  }
+  drawParticles(dt);
+  drawWaterFront();
+  drawBoats('front');
+  drawPopups(dt);
+}
+
+// ---------- boats ----------
+// Each boat sails toward the viewer through the strait: it approaches from the distance (small, behind
+// the bridge), passes through the bridge's plane (where it can hit parts and piers), then sails past.
+// Shapes are polygons in metres: x from the lane centre, h above the waterline.
+const BOATS = {
+  speedboat: { name: 'Speedboat', len: 6, half: 2.5, parts: [
+    { fill: '#f4f3ee', poly: [[-2.1, 1.0], [2.5, 1.0], [1.9, -0.3], [-1.8, -0.3]] },
+    { fill: '#d2463a', poly: [[-2.0, 0.55], [2.32, 0.55], [2.22, 0.3], [-1.92, 0.3]] },
+    { fill: '#bfe3ef', poly: [[-0.4, 1.0], [0.9, 1.0], [0.3, 1.9], [-0.2, 1.9]] }
+  ]},
+  tugboat: { name: 'Tugboat', len: 9, half: 3.4, parts: [
+    { fill: '#c8402f', poly: [[-3.2, 1.6], [3.4, 1.6], [2.8, -0.4], [-2.9, -0.4]] },
+    { fill: '#1d2329', poly: [[-3.15, 1.6], [3.36, 1.6], [3.3, 1.35], [-3.1, 1.35]] },
+    { fill: '#f2efe6', poly: [[-1.8, 1.6], [1.0, 1.6], [1.0, 3.4], [-1.8, 3.4]] },
+    { fill: '#f2efe6', poly: [[-1.2, 3.4], [0.6, 3.4], [0.6, 5.0], [-1.2, 5.0]] },
+    { fill: '#bfe3ef', poly: [[-1.0, 4.0], [0.4, 4.0], [0.4, 4.6], [-1.0, 4.6]] },
+    { fill: '#1d2329', poly: [[1.2, 3.0], [1.8, 3.0], [1.9, 6.2], [1.1, 6.2]] },
+    { fill: '#f08a24', poly: [[1.13, 5.2], [1.87, 5.2], [1.88, 5.6], [1.12, 5.6]] }
+  ]},
+  cargo: { name: 'Cargo ship', len: 18, half: 6.8, parts: [
+    { fill: '#2f4f6a', poly: [[-6.5, 3.0], [6.8, 3.0], [6.0, -0.5], [-6.2, -0.5]] },
+    { fill: '#a8382c', poly: [[-6.25, 0.4], [6.2, 0.4], [6.0, -0.5], [-6.2, -0.5]] },
+    { fill: '#d9652b', poly: [[-5.6, 3.0], [-3.2, 3.0], [-3.2, 4.3], [-5.6, 4.3]] },
+    { fill: '#3e7fb0', poly: [[-3.1, 3.0], [-0.7, 3.0], [-0.7, 4.3], [-3.1, 4.3]] },
+    { fill: '#e8c24a', poly: [[-0.6, 3.0], [1.8, 3.0], [1.8, 4.3], [-0.6, 4.3]] },
+    { fill: '#4f8f5a', poly: [[-5.6, 4.3], [-3.2, 4.3], [-3.2, 5.6], [-5.6, 5.6]] },
+    { fill: '#c8402f', poly: [[-3.1, 4.3], [-0.7, 4.3], [-0.7, 5.6], [-3.1, 5.6]] },
+    { fill: '#f2efe6', poly: [[3.4, 3.0], [5.8, 3.0], [5.8, 8.0], [3.4, 8.0]] },
+    { fill: '#bfe3ef', poly: [[3.6, 7.0], [5.6, 7.0], [5.6, 7.6], [3.6, 7.6]] },
+    { fill: '#1d2329', poly: [[4.5, 8.0], [4.8, 8.0], [4.8, 9.6], [4.5, 9.6]] }
+  ]},
+  sailboat: { name: 'Sailboat', len: 9, half: 2.8, parts: [
+    { fill: '#f4f1e8', poly: [[-2.6, 1.2], [2.8, 1.2], [2.0, -0.4], [-2.0, -0.4]] },
+    { fill: '#2f6fa0', poly: [[-2.5, 0.75], [2.62, 0.75], [2.5, 0.5], [-2.4, 0.5]] },
+    { fill: '#5a4a3a', poly: [[-0.1, 1.2], [0.1, 1.2], [0.1, 11.5], [-0.1, 11.5]] },
+    { fill: '#f7f7f2', poly: [[0.18, 2.0], [0.18, 11.0], [3.0, 2.0]] },
+    { fill: '#e9e4d6', poly: [[-0.18, 1.8], [-0.18, 10.0], [-2.3, 1.8]] }
+  ]}
+};
+const FLEET = ['speedboat', 'tugboat', 'cargo', 'sailboat'];
+for (const k of FLEET) BOATS[k].top = Math.max(...BOATS[k].parts.flatMap(p => p.poly.map(q => q[1])));
+// Boats sail straight toward the viewer at a steady speed. z is the boat centre's distance in front of
+// the bridge (negative = behind it). Size follows simple perspective, so motion is smooth all the way through.
+const BOAT_PERIOD = 11, BOAT_SPEED = 9, BOAT_FAR = 40, BOAT_NEAR = 14, VIEW_DIST = 24;
+const BOAT_APPROACH = BOAT_FAR / BOAT_SPEED;
+
+let boatCfg = { on: false, type: 'cargo', lane: 12, delay: 5 };
+try { const c = JSON.parse(localStorage.getItem('island-span-boats') || 'null'); if (c) boatCfg = Object.assign(boatCfg, c); } catch (e) {}
+function saveBoats() { try { localStorage.setItem('island-span-boats', JSON.stringify(boatCfg)); } catch (e) {} }
+function laneFor(type) {
+  const half = BOATS[type].half, gap = WORLD.rightEdge - WORLD.leftEdge;
+  return Math.max(WORLD.leftEdge + half + 0.3, Math.min(WORLD.rightEdge - half - 0.3, boatCfg.lane));
+}
+function boatTypeFor(i) { return boatCfg.type === 'mixed' ? FLEET[i % FLEET.length] : boatCfg.type; }
+
+// where boat number i is right now: scale k, waterline, phase
+// boat i's bow reaches the bridge `delay` seconds into the test, later boats every BOAT_PERIOD
+function boatArrive(i) { return (boatCfg.delay ?? 5) + i * BOAT_PERIOD; }
+function boatState(t, i, type) {
+  const len = BOATS[type].len;
+  const z = -len / 2 + (t - boatArrive(i)) * BOAT_SPEED;
+  if (z < -BOAT_FAR || z > BOAT_NEAR) return null;
+  const k = VIEW_DIST / (VIEW_DIST - z);
+  return {
+    z, k,
+    wl: WORLD.water + Math.max(0, k - 1) * 4,               // closer boats sit lower in the frame
+    alpha: z < 0 ? 0.35 + 0.65 * (1 - z / -BOAT_FAR) : 1 - Math.max(0, (z - BOAT_NEAR * 0.55) / (BOAT_NEAR * 0.45)),
+    inPlane: Math.abs(z) <= len / 2,                       // some part of the hull is under the bridge
+    eta: boatArrive(i) - t
+  };
+}
+
+function pointInPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function segsCross(ax, ay, bx, by, cx, cy, dx, dy) {
+  const d = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
+  if (Math.abs(d) < 1e-12) return false;
+  const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / d;
+  const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / d;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+}
+function segHitsPoly(ax, ay, bx, by, poly) {
+  if (pointInPoly(ax, ay, poly) || pointInPoly(bx, by, poly)) return true;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) if (segsCross(ax, ay, bx, by, poly[j][0], poly[j][1], poly[i][0], poly[i][1])) return true;
+  return false;
+}
+function worldPolys(type, lane, wl) { return BOATS[type].parts.map(p => p.poly.map(([x, h]) => [lane + x, wl - h])); }
+
+function updateBoats() {
+  if (!sim || !boatCfg.on) return;
+  const t = sim.t;
+  sim.boats = sim.boats || {};
+  const i = Math.max(0, Math.floor((t - boatArrive(0)) / BOAT_PERIOD) + 1);
+  for (const idx of [i - 2, i - 1, i]) {
+    if (idx < 0) continue;
+    const type = boatTypeFor(idx);
+    const st = boatState(t, idx, type);
+    if (!st) continue;
+    const b = sim.boats[idx] || (sim.boats[idx] = { type, lane: laneFor(type), hits: 0, sunk: false });
+    if (!st.inPlane || b.sunk) continue;
+    // piers standing in the boat's path sink it where it is
+    for (const n of design.nodes) {
+      if (!n.foundation || n.y > WORLD.water + 0.5) continue;
+      if (Math.abs(n.x - b.lane) < BOATS[b.type].half + 0.5 && n.x > WORLD.leftEdge + 0.01 && n.x < WORLD.rightEdge - 0.01) {
+        b.sunk = true; b.sinkAt = t; b.sinkState = st;
+        popups.push({ x: b.lane, y: WORLD.water - BOATS[b.type].top - 1, text: `${BOATS[b.type].name} hit a pier`, life: 2.2 });
+        splash(b.lane); splash(b.lane + 1);
+        break;
+      }
+    }
+    if (b.sunk) continue;
+    // checked every frame while the hull is under the bridge: anything that moves into the boat's outline gets knocked out
+    const polys = worldPolys(b.type, b.lane, WORLD.water);
+    for (const bm of sim.beams) {
+      if (bm.broken) continue;
+      const A = sim.nodes[bm.a], B = sim.nodes[bm.b];
+      if (polys.some(p => segHitsPoly(A.x, A.y, B.x, B.y, p))) {
+        bm.broken = true; sim.breaks++; b.hits++;
+        burst((A.x + B.x) / 2, (A.y + B.y) / 2, PALETTE[bm.mat], 14, 4);
+        if (b.hits === 1) popups.push({ x: b.lane, y: WORLD.water - BOATS[b.type].top - 1, text: `${BOATS[b.type].name} hit the bridge`, life: 2.2 });
+      }
+    }
+  }
+  // HUD: describe the boat that matters most right now
+  const info = $('boatInfo');
+  let shown = null;
+  for (const idx of [i - 2, i - 1, i]) {
+    if (idx < 0 || !sim.boats[idx]) continue;
+    const b = sim.boats[idx], st = boatState(t, idx, b.type);
+    if (st) { shown = { b, st }; if (st.eta > -0.01 || st.inPlane) break; }
+  }
+  if (shown) {
+    const { b, st } = shown, name = BOATS[b.type].name;
+    info.textContent = b.sunk ? `${name} sank` : st.eta > 0 ? `${name} arrives in ${st.eta.toFixed(1)} s · ${BOATS[b.type].top.toFixed(1)} m tall`
+      : st.inPlane ? `${name} passing under` : b.hits ? `${name} got through, bridge damaged` : `${name} got through cleanly`;
+  } else {
+    let idx = 0; while (boatArrive(idx) < t) idx++;
+    info.textContent = `${idx === 0 ? 'First' : 'Next'} boat reaches the bridge in ${(boatArrive(idx) - t).toFixed(1)} s`;
+  }
+}
+
+function drawBoatShape(type, lane, wl, k, alpha, opts = {}) {
+  const [, wls] = toS(0, wl);
+  const [, surf] = toS(0, WORLD.water);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, 0, W, Math.min(wls, opts.sinkClip ? surf : wls)); ctx.clip();
+  ctx.globalAlpha = alpha;
+  if (opts.tilt) { const [px, py] = toS(lane, wl); ctx.translate(px, py); ctx.rotate(opts.tilt); ctx.translate(-px, -py); }
+  for (const p of BOATS[type].parts) {
+    ctx.beginPath();
+    p.poly.forEach(([x, h], j) => { const [sx, sy] = toS(lane + x * k, wl - h * k); j ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); });
+    ctx.closePath();
+    ctx.fillStyle = p.fill; ctx.fill();
+    ctx.strokeStyle = '#15222a55'; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+  // wake at the waterline
+  if (!opts.noWake) {
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.fillStyle = '#e6f3f5';
+    const half = BOATS[type].half * k;
+    const [x1, y1] = toS(lane - half - 0.4 * k, wl), [x2] = toS(lane + half + 0.4 * k, wl);
+    ctx.beginPath(); ctx.ellipse((x1 + x2) / 2, y1, (x2 - x1) / 2, Math.max(2, cam.s * 0.12 * k), 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawBoats(layer) {
+  if (!boatCfg.on) return;
+  if (!sim) {
+    if (layer !== 'back') return;
+    // build mode: dashed clearance outline at the chosen lane
+    const types = boatCfg.type === 'mixed' ? FLEET : [boatCfg.type];
+    const tallest = types.reduce((a, b) => BOATS[b].top > BOATS[a].top ? b : a);
+    const lane = laneFor(tallest);
+    ctx.save();
+    ctx.setLineDash([6, 5]); ctx.lineWidth = 1.5; ctx.strokeStyle = '#15222acc'; ctx.fillStyle = '#ffffff22';
+    for (const p of BOATS[tallest].parts) {
+      ctx.beginPath();
+      p.poly.forEach(([x, h], j) => { const [sx, sy] = toS(lane + x, WORLD.water - h); j ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); });
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+    // clearance line and label
+    const topY = WORLD.water - BOATS[tallest].top;
+    const [lx1, ly] = toS(lane - BOATS[tallest].half, topY), [lx2] = toS(lane + BOATS[tallest].half, topY);
+    ctx.strokeStyle = '#f08a24'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(lx1, ly); ctx.lineTo(lx2, ly); ctx.stroke();
+    const label = `${boatCfg.type === 'mixed' ? 'Tallest boat: ' : ''}${BOATS[tallest].name} · ${BOATS[tallest].top.toFixed(1)} m tall`;
+    ctx.font = '600 12px Archivo, sans-serif';
+    const tw = ctx.measureText(label).width;
+    const [cx] = toS(lane, 0);
+    ctx.fillStyle = '#15222ae6'; ctx.fillRect(cx - tw / 2 - 7, ly - 26, tw + 14, 20);
+    ctx.fillStyle = '#edf3f1'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, cx, ly - 16);
+    // buoys marking the lane
+    for (const s of [-1, 1]) {
+      const [bx, by] = toS(lane + s * (BOATS[tallest].half + 0.3), WORLD.water);
+      ctx.fillStyle = s < 0 ? '#d2463a' : '#4f8f5a';
+      ctx.beginPath(); ctx.arc(bx, by - cam.s * 0.15 + Math.sin(time * 2 + s) * 2, Math.max(4, cam.s * 0.25), Math.PI, 0); ctx.fill();
+    }
+    return;
+  }
+  if (!sim.boats) return;
+  for (const idx in sim.boats) {
+    const b = sim.boats[idx];
+    if (b.sunk) {
+      if (layer !== 'back') continue;
+      const u = Math.min(1, (sim.t - b.sinkAt) / 3);
+      if (u >= 1) continue;
+      const st = b.sinkState;
+      drawBoatShape(b.type, b.lane, WORLD.water + u * (BOATS[b.type].top + 1), st.k, 1, { tilt: u * 0.5, sinkClip: true, noWake: true });
+      continue;
+    }
+    const st = boatState(sim.t, +idx, b.type);
+    if (!st) continue;
+    // behind the bridge until its middle passes the bridge line, then in front
+    if ((layer === 'front') !== (st.z >= 0)) continue;
+    drawBoatShape(b.type, b.lane, st.wl, st.k, st.alpha);
+  }
+}
+
+// ---------- loop ----------
+let last = performance.now(), acc = 0;
+function frame(now) {
+  let dt = Math.min(0.05, (now - last) / 1000); last = now;
+  time += dt;
+  if (sim) {
+    acc += dt; let steps = 0;
+    while (acc >= 1 / 60 && steps < 3) { stepSim(sim, 1 / 60); acc -= 1 / 60; steps++; }
+    if (steps === 3) acc = 0;
+    sim.peak = Math.max(sim.peak || 0, sim.maxStress);
+    if (sim.vehicle && !userCam) {
+      const body = sim.nodes[sim.carNodes[2]];
+      const tx = Math.max(fitX - 14, Math.min(fitX, body.x + 9));
+      cam.x += (tx - cam.x) * Math.min(1, dt * 3);
+    }
+    // air time: show it when a vehicle lands after a real jump
+    if (sim.vehicle) {
+      if (sim.airborne > 0) sim.flight = sim.airborne;
+      else if (sim.flight) {
+        if (sim.flight > 0.35) {
+          const w = sim.nodes[sim.carNodes[1]];
+          popups.push({ x: w.x, y: w.y - 2.5, text: `${sim.flight.toFixed(1)} s air`, life: 1.4 });
+          burst(w.x, w.y + 0.3, '#cfc6b4', 8, 2);
+        }
+        sim.flight = 0;
+      }
+    }
+    updateBoats();
+    for (const e of sim.events.splice(0)) burst(e.x, e.y, PALETTE[e.mat], 14, 4);
+    // node splashes
+    for (const n of sim.nodes) {
+      if (n.w && !n.wet && n.y > WORLD.water) { n.wet = true; if (Math.abs(n.vy) > 2) splash(n.x); }
+    }
+    const pct = Math.round(Math.min(1.5, sim.maxStress) * 100);
+    $('stressVal').textContent = pct + '%';
+    const bar = $('stressBar'); bar.style.width = Math.min(100, pct) + '%'; bar.style.background = stressColor(sim.maxStress);
+    $('stall').hidden = !sim.pistonJammed;
+    if (sim.pistonJammed) $('stall').textContent = `${sim.pistonJammed} piston${sim.pistonJammed > 1 ? 's' : ''} stalled to protect the bridge (marked on the bridge) · move the slider back, or tap a piston to switch it off`;
+    if (!sim.reported && sim.status !== 'running' && sim.vehicle) {
+      sim.reported = true; showBanner(sim.status === 'success');
+    }
+  }
+  render(dt);
+  requestAnimationFrame(frame);
+}
+
+// ---------- input ----------
+const pointers = new Map();
+let pinch = null, panning = null, downInfo = null;
+function worldFromEvent(e) { const r = cv.getBoundingClientRect(); return toW(e.clientX - r.left, e.clientY - r.top); }
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), s: cam.s, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, camx: cam.x, camy: cam.y };
+    downInfo = null; dragging = false;
+    if (pending && pending.fresh) pending = null;
+    return;
+  }
+  if (e.button === 1 || (e.button === 0 && e.shiftKey) || (sim && e.button === 0)) {
+    panning = { x: e.clientX, y: e.clientY, camx: cam.x, camy: cam.y }; return;
+  }
+  if (sim) return;
+  const [wx, wy] = worldFromEvent(e);
+  hover = [wx, wy];
+  if (e.button === 2) { eraseAt(wx, wy); return; }
+  if (tool === 'erase') { eraseAt(wx, wy); return; }
+  if (tool === 'move') {
+    const n = nearestNode(wx, wy, pickRadius());
+    if (!n) { flashHint('Grab a joint or a foundation'); return; }
+    if (n.preset) { flashHint('The orange cliff anchors are fixed'); return; }
+    moving = { id: n.id, committed: false, why: '' };
+    cv.classList.add('grabbing');
+    return;
+  }
+  if (tool === 'foundation') { placeFoundation(wx, wy); return; }
+  const n = nearestNode(wx, wy, pickRadius());
+  if (pending) {
+    const start = nodeById(pending.id);
+    if (n && n.id === pending.id) { downInfo = { t: performance.now(), sameNode: true, x: e.clientX, y: e.clientY }; return; }
+    const end = resolveEnd(start, wx, wy);
+    if (end.valid) {
+      const en = addBeam(start, end);
+      pending = { id: en.id, fresh: true };
+      downInfo = { t: performance.now(), x: e.clientX, y: e.clientY, chained: true };
+      dragging = true;
+    } else flashHint(end.why || 'Too short');
+    return;
+  }
+  if (n) { pending = { id: n.id, fresh: true }; dragging = true; downInfo = { t: performance.now(), x: e.clientX, y: e.clientY }; }
+  else {
+    const pb = tool === 'hydraulics' ? pistonAt(wx, wy, design.beams, b => [nodeById(b.a), nodeById(b.b)]) : null;
+    if (pb) { commit(); togglePiston(pb); }
+    else flashHint(tool === 'hydraulics' ? 'Start a piston from a joint, or tap the middle of a piston to switch it on or off' : 'Start a part from a joint or an orange anchor');
+  }
+});
+cv.addEventListener('pointermove', e => {
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    cam.s = Math.max(6, Math.min(90, pinch.s * d / pinch.d));
+    const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+    cam.x = pinch.camx - (cx - pinch.cx) / cam.s; cam.y = pinch.camy - (cy - pinch.cy) / cam.s;
+    userCam = true; return;
+  }
+  if (panning) {
+    cam.x = panning.camx - (e.clientX - panning.x) / cam.s;
+    cam.y = panning.camy - (e.clientY - panning.y) / cam.s;
+    userCam = true; return;
+  }
+  hover = worldFromEvent(e);
+  if (moving) {
+    const n = nodeById(moving.id);
+    const r = tryMove(n, hover[0], hover[1]);
+    if (r.why) moving.why = r.why;
+    else {
+      moving.why = '';
+      if (r.x !== n.x || r.y !== n.y) {
+        if (!moving.committed) { commit(); moving.committed = true; }
+        n.x = r.x; n.y = r.y; updateCost();
+      }
+    }
+  }
+});
+function endPointer(e) {
+  if (moving) {
+    if (moving.committed) changed();
+    moving = null; cv.classList.remove('grabbing');
+    pointers.delete(e.pointerId); return;
+  }
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (panning) {
+    const moved = Math.hypot(e.clientX - panning.x, e.clientY - panning.y);
+    if (sim && moved < 6) {
+      const [wx, wy] = worldFromEvent(e);
+      const pb = pistonAt(wx, wy, sim.beams, b => [sim.nodes[b.a], sim.nodes[b.b]]);
+      if (pb) { const db = design.beams.find(b => b.id === pb.id); if (db) togglePiston(db); }
+    }
+    panning = null; return;
+  }
+  if (sim || !pending || !downInfo) { dragging = false; return; }
+  const moved = Math.hypot(e.clientX - downInfo.x, e.clientY - downInfo.y);
+  const [wx, wy] = worldFromEvent(e);
+  if (downInfo.sameNode) { if (moved < 8) pending = null; downInfo = null; dragging = false; return; }
+  if (dragging && moved > 10 && !downInfo.chained) {
+    const start = nodeById(pending.id);
+    const end = resolveEnd(start, wx, wy);
+    if (end.valid) addBeam(start, end);
+    else if (end.why) flashHint(end.why);
+    pending = null;
+  } else if (pending) pending.fresh = false;
+  dragging = false; downInfo = null;
+}
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', e => { pointers.delete(e.pointerId); pinch = null; panning = null; dragging = false; downInfo = null; });
+cv.addEventListener('pointerleave', () => { if (!dragging) hover = null; });
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const [wx, wy] = toW(sx, sy);
+  cam.s = Math.max(6, Math.min(90, cam.s * Math.exp(-e.deltaY * 0.0015)));
+  cam.x = wx - (sx - W / 2) / cam.s; cam.y = wy - (sy - H / 2) / cam.s;
+  userCam = true;
+}, { passive: false });
+
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.target.type === 'range') return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); return; }
+  if (e.key === 'Escape') { pending = null; return; }
+  if (e.key.toLowerCase() === 'f') { userCam = false; fit(); return; }
+  if (sim && sim.vehicle && e.key.toLowerCase() === 'b') { setBrake(!sim.brake); return; }
+  if (sim && e.key.toLowerCase() === 'h') {
+    const v = +$('hydro').value >= 125 ? 100 : 150; $('hydro').value = v; onHydro(); return;
+  }
+  if (!sim) {
+    const k = parseInt(e.key);
+    if (k >= 1 && k <= 8) setTool(TOOL_ORDER[k - 1]);
+    if (e.key.toLowerCase() === 'e') setTool('erase');
+    if (e.key.toLowerCase() === 'm') setTool('move');
+  }
+});
+
+// ---------- UI ----------
+function swatchStyle(m) {
+  switch (m) {
+    case 'road': return 'background: linear-gradient(transparent 44%, #e8c24a 44% 56%, transparent 56%), #3b3f44;';
+    case 'wood': return 'background: repeating-linear-gradient(100deg, #c08f55 0 4px, #b07f47 4px 6px); box-shadow: inset 0 0 0 2px #6b4724;';
+    case 'steel': return 'background: linear-gradient(#56687a 0 25%, #9fb2c1 25% 75%, #56687a 75%);';
+    case 'rope': return 'background: repeating-linear-gradient(45deg, #a5804c 0 3px, #d8b67e 3px 6px);';
+    case 'cable': return 'background: linear-gradient(transparent 40%, #2a3139 40% 60%, transparent 60%), #c4ccd0;';
+    case 'foundation': return 'background: linear-gradient(90deg, #8a908b, #c4c8c2, #7c827d);';
+    case 'spring': return 'background: repeating-linear-gradient(60deg, #3d8fd1 0 3px, #cfe2f2 3px 5px, #1f5d93 5px 7px);';
+    case 'hydraulics': return 'background: linear-gradient(90deg, #d9652b 0 55%, #c9d3d9 55%);';
+    case 'move': return 'background: radial-gradient(circle, #e9edec 0 28%, #2a3238 29% 36%, transparent 37%), conic-gradient(from 45deg, #f08a24 0 25%, #15222a 0 50%, #f08a24 0 75%, #15222a 0);';
+    case 'erase': return 'background: repeating-linear-gradient(45deg, #e2564a 0 4px, #15222a 4px 8px);';
+  }
+}
+function buildToolbar() {
+  const strip = $('strip');
+  TOOL_ORDER.forEach((m, i) => {
+    const b = document.createElement('button');
+    b.className = 'tool'; b.id = 'tool-' + m;
+    const name = m === 'erase' ? 'Erase' : m === 'move' ? 'Move' : MATERIALS[m].name;
+    const price = m === 'erase' ? 'right-click too' : m === 'move' ? 'drag joints' : m === 'foundation' ? `$${MATERIALS.foundation.cost} each` : `$${MATERIALS[m].cost}/m`;
+    b.innerHTML = `<span class="sw" style="${swatchStyle(m)}"></span><span class="nm">${name}<kbd>${m === 'erase' ? 'E' : m === 'move' ? 'M' : i + 1}</kbd></span><span class="pr">${price}</span>`;
+    b.addEventListener('click', () => setTool(m));
+    strip.appendChild(b);
+  });
+}
+function setTool(m) {
+  tool = m;
+  for (const t of TOOL_ORDER) $('tool-' + t).setAttribute('aria-pressed', t === m ? 'true' : 'false');
+  if (m === 'erase' || m === 'foundation' || m === 'move') pending = null;
+  cv.classList.toggle('erase', m === 'erase');
+  cv.classList.toggle('move', m === 'move');
+  updateHint();
+}
+let hintTimer = null;
+function updateHint() {
+  const h = $('hint');
+  if (sim) {
+    h.innerHTML = design.beams.some(b => b.mat === 'hydraulics')
+      ? 'Drag the <b>Hydraulics</b> slider (or press H) to move pistons · tap a piston to switch it off or on · drag to pan'
+      : 'Watching the load · press B or the Brake button to stop the vehicle · drag to pan, scroll or pinch to zoom';
+    return;
+  }
+  let extra = tool === 'erase' || tool === 'foundation' || tool === 'move' ? '' : ' · drag from a joint, or tap joints in a chain · build over a part to add a layer (up to 4)';
+  h.innerHTML = `<b>${DESC[tool].split(' · ')[0]}</b> · ${DESC[tool].split(' · ').slice(1).join(' · ')}${extra}`;
+}
+function flashHint(msg) {
+  const h = $('hint'); h.innerHTML = `<b>${msg}</b>`;
+  clearTimeout(hintTimer); hintTimer = setTimeout(updateHint, 1800);
+}
+function undo() {
+  if (sim || !history.length) return;
+  design = history.pop(); pending = null; changed();
+}
+function setBrake(on) {
+  if (sim) sim.brake = on;
+  $('brake').setAttribute('aria-pressed', on ? 'true' : 'false');
+  $('brake').textContent = on ? 'Braking · release' : 'Brake';
+}
+function togglePlay() { sim ? stopSim() : startSim(); }
+function onHydro() {
+  const v = +$('hydro').value; $('hydroVal').textContent = v + '%';
+  if (sim) sim.pistonTarget = v / 100;
+}
+$('play').addEventListener('click', togglePlay);
+$('brake').addEventListener('click', () => setBrake(!(sim && sim.brake)));
+$('undo').addEventListener('click', undo);
+$('clear').addEventListener('click', () => { if (sim) stopSim(); $('confirm').hidden = false; });
+$('cYes').addEventListener('click', () => { commit(); design = { nodes: presetAnchors(), beams: [] }; pending = null; changed(); $('confirm').hidden = true; });
+$('cNo').addEventListener('click', () => { $('confirm').hidden = true; });
+$('example').addEventListener('click', () => { if (sim) stopSim(); loadExample(); });
+$('hydro').addEventListener('input', onHydro);
+$('bRetry').addEventListener('click', () => { startSim(); });
+$('bEdit').addEventListener('click', () => { stopSim(); });
+$('vehicle').addEventListener('change', () => { if (sim) startSim(); });
+function syncBoatUI() {
+  $('boatsOn').checked = boatCfg.on;
+  $('boatType').value = boatCfg.type;
+  $('boatLane').value = boatCfg.lane;
+  $('boatLaneVal').textContent = `${(+boatCfg.lane).toFixed(1)} m`;
+  $('boatDelay').value = boatCfg.delay;
+  $('boatDelayVal').textContent = `${(+boatCfg.delay).toFixed(1)} s`;
+  $('boatsBtn').textContent = boatCfg.on ? 'Boats: on' : 'Boats: off';
+  $('boatsBtn').classList.toggle('on', boatCfg.on);
+  $('boatInfo').hidden = !boatCfg.on;
+}
+$('boatsBtn').addEventListener('click', () => {
+  const open = $('boatPanel').hidden;
+  $('boatPanel').hidden = !open; $('boatsBtn').setAttribute('aria-expanded', String(open));
+});
+$('boatsOn').addEventListener('change', e => { boatCfg.on = e.target.checked; saveBoats(); syncBoatUI(); if (sim) startSim(); });
+$('boatType').addEventListener('change', e => { boatCfg.type = e.target.value; if (!boatCfg.on) boatCfg.on = true; saveBoats(); syncBoatUI(); if (sim) startSim(); });
+$('boatLane').addEventListener('input', e => { boatCfg.lane = +e.target.value; if (!boatCfg.on) boatCfg.on = true; saveBoats(); syncBoatUI(); });
+$('boatLane').addEventListener('change', () => { if (sim) startSim(); });
+$('boatDelay').addEventListener('input', e => { boatCfg.delay = +e.target.value; if (!boatCfg.on) boatCfg.on = true; saveBoats(); syncBoatUI(); });
+$('boatDelay').addEventListener('change', () => { if (sim) startSim(); });
+cv.addEventListener('pointerdown', () => { if (!$('boatPanel').hidden) { $('boatPanel').hidden = true; $('boatsBtn').setAttribute('aria-expanded', 'false'); } }, true);
+
+// ---------- boot ----------
+function start(data) {
+  const restored = (data && data.design) || load();
+  if (restored) design = restored;
+  if (!design.nodes.some(n => n.preset)) design.nodes = presetAnchors().concat(design.nodes);
+  fixUid();
+  buildToolbar(); setTool('road'); syncBoatUI();
+  resize(); updateCost();
+  window.addEventListener('resize', resize);
+  window.claude?.hot?.snapshot?.(() => ({ design }));
+  requestAnimationFrame(t => { last = t; frame(t); });
+}
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
